@@ -3,6 +3,15 @@ name: api-contract-design
 description: Design API contracts using OpenAPI specification, ensuring backward compatibility, proper versioning, and contract-first development approach.
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 # API Contract Design Skill
 
 ## Purpose

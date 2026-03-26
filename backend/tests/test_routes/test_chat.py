@@ -11,7 +11,7 @@ import json
 
 from src.main import app
 from src.models import Task, Conversation, Message
-from src.auth.jwt import create_access_token
+from src.auth import create_access_token
 
 
 class TestChatEndpoint:

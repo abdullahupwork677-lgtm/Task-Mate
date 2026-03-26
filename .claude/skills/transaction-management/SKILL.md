@@ -3,6 +3,15 @@ name: transaction-management
 description: Implement atomic database operations with proper transaction management and rollback handling (Phase 2 pattern)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

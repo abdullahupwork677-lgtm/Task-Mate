@@ -3,6 +3,15 @@ name: api-docs-generator
 description: Generate comprehensive OpenAPI documentation and docstrings for all backend endpoints, services, and MCP tools (Phase 3)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

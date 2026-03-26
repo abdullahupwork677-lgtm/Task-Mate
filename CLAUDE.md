@@ -46,6 +46,17 @@ todo-chatbot-phase3/
 
 ---
 
+## 🤖 AI Agent Workflow
+
+**This project supports multiple AI agents:**
+
+- **AGENTS.md** - Universal Spec-Driven Development rules (Claude, Copilot, Gemini, all AI agents)
+- **CLAUDE.md** (this file) - Claude Code specific patterns, skills, and project navigation
+
+**Quick rule:** Read `AGENTS.md` first for workflow principles, then this file for Claude Code specifics.
+
+---
+
 ## 🔌 MCP Server Integration (Model Context Protocol)
 
 **Enhanced with programmatic API control for deployment and version control platforms.**
@@ -358,3 +369,14 @@ cat .claude/skills/jwt-authentication/SKILL.md
 **Run:** `/sp.skill-learner` to capture and update skills
 
 **Goal:** Never solve the same problem twice. Once solved, it lives in a skill forever.
+
+## Active Technologies
+- Python 3.13+ (Backend), TypeScript (Frontend Next.js 14) + FastAPI, SQLModel, PostgreSQL (Neon Serverless), OpenAI Agents SDK, MCP SDK, Next.js 14, Tailwind CSS (005-task-sort)
+- Neon Serverless PostgreSQL (external to K8s) with Alembic migrations (005-task-sort)
+- Python 3.13+ (Backend), TypeScript (Frontend Next.js 14) + FastAPI, SQLModel, PostgreSQL (Neon Serverless), OpenAI Agents SDK, MCP SDK, Next.js 14, Tailwind CSS, Reac (003-task-tags)
+- Neon Serverless PostgreSQL with JSONB field for tags array, GIN index for filtering (003-task-tags)
+- Python 3.13+ (Backend), TypeScript (Frontend Next.js 14) + FastAPI, SQLModel, PostgreSQL (ILIKE + indexes), OpenAI Agents SDK, MCP SDK, Next.js 14, React, Tailwind CSS (004-search-filter)
+- Neon Serverless PostgreSQL with composite indexes for efficient filtering (no schema changes, existing fields used) (004-search-filter)
+
+## Recent Changes
+- 005-task-sort: Added Python 3.13+ (Backend), TypeScript (Frontend Next.js 14) + FastAPI, SQLModel, PostgreSQL (Neon Serverless), OpenAI Agents SDK, MCP SDK, Next.js 14, Tailwind CSS

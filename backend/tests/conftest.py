@@ -107,3 +107,41 @@ def mock_conversation_service():
         "target_task_id": None
     })
     return service
+
+
+# Alias fixtures for consistency across test files
+@pytest.fixture
+def db_session(db):
+    """Alias for db fixture - provides database session."""
+    return db
+
+
+@pytest.fixture
+def test_user(db_session):
+    """Create a test user in database for integration tests."""
+    if SKIP_DB_TESTS:
+        # Return mock user when DB is skipped
+        user = Mock()
+        user.id = "test-user-123"
+        user.email = "test@example.com"
+        user.name = "Test User"
+        return user
+
+    from src.models import User
+
+    user = User(
+        id="test-user-phase8",
+        email="test.phase8@example.com",
+        name="Test User Phase 8",
+        hashed_password="$2b$12$dummy.hash.for.testing"
+    )
+
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    yield user
+
+    # Cleanup after test
+    db_session.delete(user)
+    db_session.commit()

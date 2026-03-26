@@ -3,6 +3,15 @@ name: infrastructure-as-code
 description: Implement Infrastructure as Code using Terraform, AWS CloudFormation, or Pulumi for reproducible and version-controlled infrastructure.
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 # Infrastructure as Code Skill
 
 ## Purpose

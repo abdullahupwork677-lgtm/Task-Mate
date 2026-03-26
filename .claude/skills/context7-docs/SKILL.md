@@ -1,3 +1,8 @@
+---
+name: context7-docs
+description: On-demand access to official library documentation via Context7 MCP server
+---
+
 # Context7 Documentation Lookup Skill
 
 ## Overview

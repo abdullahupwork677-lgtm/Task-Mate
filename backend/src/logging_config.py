@@ -1,37 +1,27 @@
-"""Structured JSON logging configuration for production."""
+"""Structured JSON logging configuration for production.
 
-import logging
-import sys
+Phase V - Production Readiness
+Task: T181, T183
+"""
 
-from pythonjsonlogger import jsonlogger
+import os
+from src.utils.logger import setup_json_logging
 
 
 def setup_logging():
-    """Configure structured JSON logging for production observability.
+    """Configure structured JSON logging for production observability (T181).
 
-    Sets up JSON-formatted logging to stdout with renamed fields
-    for compatibility with log aggregation tools (DataDog, Splunk, CloudWatch).
+    Sets up JSON-formatted logging to stdout with trace_id for correlation
+    across services. Compatible with log aggregation tools (DataDog, Splunk, CloudWatch).
+
+    Environment Variables:
+        LOG_LEVEL: Logging level (DEBUG, INFO, WARNING, ERROR) - defaults to INFO
+        SERVICE_NAME: Service name for logs - defaults to "backend-api"
     """
-    # Create JSON formatter with field renaming
-    formatter = jsonlogger.JsonFormatter(
-        fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
-        rename_fields={
-            "asctime": "timestamp",
-            "levelname": "level",
-            "name": "logger",
-        },
-    )
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    service_name = os.getenv("SERVICE_NAME", "backend-api")
 
-    # Console handler for stdout
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(formatter)
+    # Initialize structlog-based JSON logging
+    setup_json_logging(service_name=service_name, log_level=log_level)
 
-    # Configure root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-
-    # Clear existing handlers to avoid duplicates
-    root_logger.handlers.clear()
-    root_logger.addHandler(handler)
-
-    return root_logger
+    return None  # structlog doesn't use root logger

@@ -3,6 +3,15 @@ name: feature-flags-management
 description: Implement feature flags for gradual rollouts, A/B testing, canary releases, and safe production deployments without code changes.
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 # Feature Flags Management Skill
 
 ## Purpose

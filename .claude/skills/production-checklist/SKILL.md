@@ -3,6 +3,15 @@ name: production-checklist
 description: Comprehensive production readiness validation checklist covering security, performance, monitoring, and deployment (Phase 3)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

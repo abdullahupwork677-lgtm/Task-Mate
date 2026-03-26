@@ -31,7 +31,7 @@ app.add_middleware(
 setup_error_handlers(app)
 
 # Register routes
-from src.routes import auth, health, tasks, chat, conversations, voice
+from src.routes import auth, health, tasks, chat, conversations, voice, reminders, notification_preferences, in_app_notifications, metrics
 
 app.include_router(health.router)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
@@ -39,6 +39,10 @@ app.include_router(tasks.router, prefix=settings.api_v1_prefix)
 app.include_router(chat.router, prefix=settings.api_v1_prefix)
 app.include_router(conversations.router)
 app.include_router(voice.router)
+app.include_router(reminders.router)  # Internal Dapr endpoints
+app.include_router(notification_preferences.router)  # Phase V - US5: Notification preferences
+app.include_router(in_app_notifications.router)  # Phase V - US5: In-app notifications
+app.include_router(metrics.router)  # Phase V - T188: Prometheus metrics
 
 
 @app.get("/")

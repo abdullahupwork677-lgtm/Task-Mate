@@ -3,6 +3,15 @@ name: websocket-realtime
 description: Implement WebSocket connections for real-time bidirectional communication, live updates, chat applications, and real-time dashboards.
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 # WebSocket & Real-time Communication Skill
 
 ## Purpose

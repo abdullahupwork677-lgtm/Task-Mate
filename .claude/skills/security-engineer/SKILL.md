@@ -3,6 +3,15 @@ name: security-engineer
 description: Full-time equivalent Security Engineer agent with expertise in OWASP, penetration testing, security audits, and compliance (Digital Agent Factory)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

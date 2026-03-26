@@ -1,0 +1,188 @@
+# T175: Parameterized values for notification-service Helm chart
+
+# Deployment configuration
+replicaCount: 3
+
+image:
+  repository: notification-service
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  protocol: TCP
+  name: http
+
+# Resource limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Kafka configuration
+kafka:
+  bootstrapServers: "redpanda:9092"
+  consumerGroup: "notification-service-group"
+  remindersTopic: "reminders"
+  dlqTopic: "reminders.dlq"
+  autoOffsetReset: "earliest"
+  enableAutoCommit: "true"
+
+# Email provider (SendGrid)
+email:
+  provider: "sendgrid"
+  fromEmail: "noreply@todoapp.com"
+  fromName: "Todo App Reminders"
+  # API key stored in secret
+  apiKeySecret:
+    name: notification-service-secrets
+    key: sendgrid-api-key
+
+# Firebase Push Notifications
+firebase:
+  enabled: true
+  # Credentials stored in secret
+  credentialsSecret:
+    name: notification-service-secrets
+    key: firebase-credentials
+
+# Database configuration
+database:
+  # Connection string stored in secret
+  urlSecret:
+    name: notification-service-secrets
+    key: database-url
+
+# In-App Notifications
+inAppNotifications:
+  retentionDays: 30
+
+# Application configuration
+app:
+  logLevel: "INFO"
+  environment: "production"
+  port: 8080
+
+# Health check configuration
+healthCheck:
+  kafkaTimeout: 5
+  dbTimeout: 5
+
+# Dapr configuration
+dapr:
+  enabled: true
+  appId: "notification-service"
+  appPort: 8080
+  logLevel: "info"
+  enableApiLogging: true
+
+  cron:
+    enabled: true
+    schedule: "@every 5m"
+    namespace: default
+
+  kafka:
+    enabled: true
+    namespace: default
+
+  secrets:
+    enabled: true
+    namespace: default
+
+# Health probes
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+    - ALL
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity rules
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - notification-service
+        topologyKey: kubernetes.io/hostname
+
+# ConfigMap data
+configMap:
+  data:
+    KAFKA_BOOTSTRAP_SERVERS: "{{ .Values.kafka.bootstrapServers }}"
+    KAFKA_CONSUMER_GROUP: "{{ .Values.kafka.consumerGroup }}"
+    KAFKA_REMINDERS_TOPIC: "{{ .Values.kafka.remindersTopic }}"
+    KAFKA_AUTO_OFFSET_RESET: "{{ .Values.kafka.autoOffsetReset }}"
+    KAFKA_ENABLE_AUTO_COMMIT: "{{ .Values.kafka.enableAutoCommit }}"
+    SENDGRID_FROM_EMAIL: "{{ .Values.email.fromEmail }}"
+    SENDGRID_FROM_NAME: "{{ .Values.email.fromName }}"
+    FIREBASE_ENABLED: "{{ .Values.firebase.enabled }}"
+    IN_APP_RETENTION_DAYS: "{{ .Values.inAppNotifications.retentionDays }}"
+    LOG_LEVEL: "{{ .Values.app.logLevel }}"
+    ENVIRONMENT: "{{ .Values.app.environment }}"
+    PORT: "{{ .Values.app.port }}"
+    HEALTH_CHECK_KAFKA_TIMEOUT: "{{ .Values.healthCheck.kafkaTimeout }}"
+    HEALTH_CHECK_DB_TIMEOUT: "{{ .Values.healthCheck.dbTimeout }}"
+
+# Secrets (template - user provides base64 values)
+secrets:
+  sendgridApiKey: "<BASE64_ENCODED_SENDGRID_API_KEY>"
+  firebaseCredentials: "<BASE64_ENCODED_FIREBASE_CREDENTIALS_JSON>"
+  databaseUrl: "<BASE64_ENCODED_DATABASE_URL>"

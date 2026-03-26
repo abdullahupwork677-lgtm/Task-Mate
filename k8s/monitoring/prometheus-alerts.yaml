@@ -1,0 +1,83 @@
+# Prometheus Alerting Rules
+# Phase V - Production Readiness
+# Task: T195
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerts
+  namespace: monitoring
+data:
+  alerts.yml: |
+    groups:
+    - name: notification_alerts
+      interval: 30s
+      rules:
+      
+      # T195: Alert if DLQ has > 100 messages
+      - alert: DLQHighMessageCount
+        expr: dlq_size > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: notification-service
+        annotations:
+          summary: "Dead Letter Queue has high message count"
+          description: "DLQ has {{ $value }} messages (threshold: 100). Review failed notifications."
+          runbook: "https://docs.todoapp.com/runbooks/dlq-high-count"
+      
+      # Critical alert if DLQ is growing rapidly
+      - alert: DLQRapidGrowth
+        expr: rate(dlq_messages_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          component: notification-service
+        annotations:
+          summary: "Dead Letter Queue growing rapidly"
+          description: "DLQ receiving {{ $value }} messages/sec. Check notification service health."
+          runbook: "https://docs.todoapp.com/runbooks/dlq-rapid-growth"
+      
+      # Alert if notification failure rate is high
+      - alert: HighNotificationFailureRate
+        expr: rate(notification_failures_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: notification-service
+        annotations:
+          summary: "High notification failure rate"
+          description: "Notification failures at {{ $value }}/sec for {{ $labels.channel }}. Check external service health."
+      
+      # Alert if Kafka consumer is not consuming
+      - alert: KafkaConsumerLag
+        expr: kafka_consumer_lag > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: notification-service
+        annotations:
+          summary: "Kafka consumer lag is high"
+          description: "Consumer is {{ $value }} messages behind. Check notification service capacity."
+      
+      # Alert if reminder check duration is high
+      - alert: SlowReminderChecks
+        expr: reminder_check_duration_seconds > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: backend-api
+        annotations:
+          summary: "Reminder checks are slow"
+          description: "Reminder check took {{ $value }}s (threshold: 30s). Check database performance."
+      
+      # Alert if notification delivery latency is high
+      - alert: HighNotificationLatency
+        expr: histogram_quantile(0.95, rate(notification_delivery_latency_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: notification-service
+        annotations:
+          summary: "High notification delivery latency"
+          description: "P95 latency is {{ $value }}s for {{ $labels.channel }}. Check external service."

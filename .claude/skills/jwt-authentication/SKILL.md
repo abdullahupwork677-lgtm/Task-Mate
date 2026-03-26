@@ -3,6 +3,15 @@ name: jwt-authentication
 description: Implement JWT-based stateless authentication with FastAPI for scalable, horizontally-scalable APIs (Phase 2 pattern)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

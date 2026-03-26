@@ -1,0 +1,303 @@
+openapi: 3.0.3
+info:
+  title: Task Sorting API
+  description: REST API contract for task sorting feature
+  version: 1.0.0
+
+paths:
+  /api/{user_id}/tasks:
+    get:
+      summary: List user's tasks with optional sorting
+      description: |
+        Retrieve all tasks for a specific user with optional sorting.
+        Supports sorting by due_date, priority, created_at, or title.
+        Default sort is created_at descending (newest first).
+      operationId: listUserTasks
+      tags:
+        - tasks
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: User ID (must match authenticated user)
+          schema:
+            type: string
+            example: "clr12345abcdef"
+
+        - name: completed
+          in: query
+          required: false
+          description: Filter by completion status
+          schema:
+            type: boolean
+            nullable: true
+            example: false
+
+        - name: sort_by
+          in: query
+          required: false
+          description: Field to sort by
+          schema:
+            type: string
+            enum:
+              - due_date
+              - priority
+              - created_at
+              - title
+            default: created_at
+            example: due_date
+
+        - name: sort_direction
+          in: query
+          required: false
+          description: |
+            Sort direction. If not specified, defaults based on sort_by:
+            - created_at: desc (newest first)
+            - due_date: asc (earliest first)
+            - priority: asc (high to low)
+            - title: asc (A-Z)
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            nullable: true
+            example: asc
+
+      responses:
+        '200':
+          description: Successfully retrieved sorted tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  total:
+                    type: integer
+                    description: Total number of tasks
+                    example: 42
+                  sort_by:
+                    type: string
+                    description: Applied sort field
+                    example: "due_date"
+                  sort_direction:
+                    type: string
+                    description: Applied sort direction
+                    example: "asc"
+              examples:
+                sorted_by_due_date:
+                  summary: Sorted by due date ascending
+                  value:
+                    tasks:
+                      - id: 1
+                        user_id: "clr12345abcdef"
+                        title: "Buy groceries"
+                        description: "Get milk, eggs, bread"
+                        completed: false
+                        priority: "high"
+                        due_date: "2026-02-15T10:00:00Z"
+                        created_at: "2026-02-10T09:00:00Z"
+                        updated_at: "2026-02-10T09:00:00Z"
+                      - id: 2
+                        user_id: "clr12345abcdef"
+                        title: "Call doctor"
+                        description: "Annual checkup"
+                        completed: false
+                        priority: "medium"
+                        due_date: "2026-02-20T14:00:00Z"
+                        created_at: "2026-02-10T10:00:00Z"
+                        updated_at: "2026-02-10T10:00:00Z"
+                      - id: 3
+                        user_id: "clr12345abcdef"
+                        title: "Plan vacation"
+                        description: "Research destinations"
+                        completed: false
+                        priority: "low"
+                        due_date: null
+                        created_at: "2026-02-11T11:00:00Z"
+                        updated_at: "2026-02-11T11:00:00Z"
+                    total: 3
+                    sort_by: "due_date"
+                    sort_direction: "asc"
+
+                sorted_by_priority:
+                  summary: Sorted by priority high to low
+                  value:
+                    tasks:
+                      - id: 1
+                        title: "Buy groceries"
+                        priority: "high"
+                        due_date: "2026-02-15T10:00:00Z"
+                      - id: 2
+                        title: "Call doctor"
+                        priority: "medium"
+                        due_date: "2026-02-20T14:00:00Z"
+                      - id: 3
+                        title: "Plan vacation"
+                        priority: "low"
+                        due_date: null
+                    total: 3
+                    sort_by: "priority"
+                    sort_direction: "asc"
+
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: "Not authenticated"
+
+        '403':
+          description: Forbidden - User ID in path doesn't match authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: "User ID mismatch"
+
+        '400':
+          description: Bad Request - Invalid sort parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_sort_field:
+                  summary: Invalid sort_by value
+                  value:
+                    detail: "Invalid value for sort_by. Must be one of: due_date, priority, created_at, title"
+                invalid_sort_direction:
+                  summary: Invalid sort_direction value
+                  value:
+                    detail: "Invalid value for sort_direction. Must be one of: asc, desc"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Task ID
+          example: 1
+        user_id:
+          type: string
+          description: Owner user ID
+          example: "clr12345abcdef"
+        title:
+          type: string
+          description: Task title
+          minLength: 1
+          maxLength: 200
+          example: "Buy groceries"
+        description:
+          type: string
+          nullable: true
+          description: Task description
+          maxLength: 1000
+          example: "Get milk, eggs, bread"
+        completed:
+          type: boolean
+          description: Completion status
+          example: false
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: Priority level
+          example: "high"
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Task due date and time (ISO 8601 format)
+          example: "2026-02-15T10:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          description: Task creation timestamp
+          example: "2026-02-10T09:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2026-02-10T09:00:00Z"
+        is_recurring:
+          type: boolean
+          description: Whether task repeats on completion
+          example: false
+        recurrence_pattern:
+          type: string
+          nullable: true
+          description: Recurrence pattern (daily, weekly, monthly, etc.)
+          example: null
+        parent_task_id:
+          type: integer
+          nullable: true
+          description: Parent task ID for recurring task instances
+          example: null
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Error message
+          example: "Not authenticated"
+
+# Sort Behavior Documentation
+# ===========================
+#
+# Sort Field Behaviors:
+#
+# 1. due_date:
+#    - asc: Earliest due dates first, tasks without due dates last
+#    - desc: Latest due dates first, tasks without due dates last
+#    - Tiebreaker: created_at descending (newest first)
+#    - NULL Handling: NULLS LAST (tasks without due dates appear at end)
+#
+# 2. priority:
+#    - asc: high → medium → low (importance order)
+#    - desc: low → medium → high (reverse importance)
+#    - Tiebreaker: created_at descending
+#
+# 3. created_at:
+#    - asc: Oldest tasks first
+#    - desc: Newest tasks first (DEFAULT)
+#    - No tiebreaker needed (timestamps are unique enough)
+#
+# 4. title:
+#    - asc: A-Z (case-insensitive)
+#    - desc: Z-A (case-insensitive)
+#    - Tiebreaker: created_at descending
+#    - Case Handling: "attend meeting" < "Buy groceries" (lowercase comparison)
+#
+# Default Direction by Field:
+# - created_at → desc (newest first)
+# - due_date → asc (earliest first)
+# - priority → asc (high to low)
+# - title → asc (A-Z)
+#
+# Performance:
+# - Target: < 200ms for up to 1,000 tasks
+# - Requirement: < 500ms for up to 10,000 tasks
+# - Implementation: Database-level ORDER BY with composite indexes
+#
+# Security:
+# - User isolation: Only sort user's own tasks (WHERE user_id = authenticated_user.id)
+# - JWT authentication required
+# - User ID in path must match authenticated user

@@ -28,6 +28,7 @@ mcp>=0.1.0
 
 # Logging & Utilities
 python-json-logger>=2.0.7
+structlog>=24.1.0            # T181: Structured JSON logging with trace_id
 thefuzz>=0.20.0
 python-dateutil>=2.8.2
 parsedatetime>=2.6
@@ -37,5 +38,12 @@ dateparser==1.2.0       # Natural language date parsing (more powerful than pars
 rapidfuzz==3.6.0        # Fast fuzzy string matching (10-20x faster than thefuzz)
 pytest-mock==3.12.0     # Mocking framework for tests
 
+# Phase 5: Due Dates & Reminders Dependencies
+aiokafka==0.10.0        # Async Kafka client for reminder event publishing
+freezegun==1.4.0        # Time freezing for date parser tests
+
 # Load Testing
 locust>=2.20.0          # Load testing framework for 100 concurrent users test
+
+# Phase 11: Production Readiness (Observability)
+prometheus_client>=0.19.0    # T186: Prometheus metrics export

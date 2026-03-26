@@ -4,6 +4,11 @@ Updates task title, description, or priority for the authenticated user.
 
 This tool enables AI agents to modify task details based on
 natural language input.
+
+Phase V Extension (US1):
+- Support due_date as natural language string
+- Support clear_due_date flag to remove due dates
+- Reset reminder_sent when due date changes
 """
 
 from typing import Optional
@@ -13,6 +18,12 @@ from sqlmodel import Session, select
 import logging
 
 from ..models import Task
+from ..services.date_parser_service import (
+    parse_natural_date,
+    format_due_date,
+    InvalidDateError,
+    InvalidTimezoneError
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +37,9 @@ class UpdateTaskParams(BaseModel):
         title: New task title (optional)
         description: New task description (optional)
         priority: New task priority level (optional)
-        due_date: New task due date (optional)
+        due_date: New task due date in natural language (Phase V - optional)
+        clear_due_date: Flag to clear due date (Phase V - optional)
+        user_timezone: User's IANA timezone for date parsing (Phase V - defaults to UTC)
         completed: Mark as completed (True) or incomplete (False) (optional)
     """
 
@@ -38,9 +51,23 @@ class UpdateTaskParams(BaseModel):
         None,
         description="New task priority level (high, medium, low)"
     )
-    due_date: Optional[datetime] = Field(
+    due_date: Optional[str] = Field(
         None,
-        description="New task due date"
+        description=(
+            "New task due date in natural language (Phase V - US1). "
+            "Examples: 'tomorrow at 5pm', 'next Friday', 'Feb 15 at 2pm'"
+        )
+    )
+    clear_due_date: Optional[bool] = Field(
+        None,
+        description=(
+            "Set to True to clear the due date (Phase V - US1). "
+            "When True, sets due_date=NULL, remind_before=NULL, reminder_sent=NULL"
+        )
+    )
+    user_timezone: str = Field(
+        default="UTC",
+        description="User's IANA timezone for parsing due dates (e.g., 'America/New_York', 'Europe/London')"
     )
     completed: Optional[bool] = Field(
         None,
@@ -81,6 +108,7 @@ class UpdateTaskResult(BaseModel):
         completed: Task completion status
         priority: Task priority level
         due_date: Task due date
+        due_date_formatted: Human-readable due date in user's timezone (Phase V - US1)
         updated_at: Timestamp when task was updated
     """
 
@@ -90,6 +118,9 @@ class UpdateTaskResult(BaseModel):
     completed: bool = Field(..., description="Task completion status")
     priority: str = Field(..., description="Task priority level")
     due_date: Optional[datetime] = Field(None, description="Task due date")
+    due_date_formatted: Optional[str] = Field(
+        None, description="Human-readable due date in user's timezone (Phase V)"
+    )
     updated_at: datetime = Field(..., description="Timestamp of update")
 
     class Config:
@@ -141,9 +172,12 @@ def update_task(db: Session, params: UpdateTaskParams) -> UpdateTaskResult:
     """
     # Validate at least one field provided (T128)
     # Check if any field was explicitly set (using __fields_set__)
-    updateable_fields = {'title', 'description', 'priority', 'due_date', 'completed'}
+    updateable_fields = {'title', 'description', 'priority', 'due_date', 'clear_due_date', 'completed'}
     if not any(field in params.__fields_set__ for field in updateable_fields):
-        raise ValueError("At least one field (title, description, priority, due_date, or completed) must be provided")
+        raise ValueError(
+            "At least one field (title, description, priority, due_date, clear_due_date, or completed) "
+            "must be provided"
+        )
 
     logger.info(
         f"update_task: Querying task {params.task_id} for user {params.user_id}",
@@ -193,21 +227,63 @@ def update_task(db: Session, params: UpdateTaskParams) -> UpdateTaskResult:
     # This allows us to distinguish between "not provided" vs "provided as None"
     fields_set = params.__fields_set__
 
+    # Phase V - US1: Track if due date will change (for reminder_sent reset)
+    old_due_date = task.due_date
+    parsed_due_date = None
+    due_date_formatted = None
+
     if 'title' in fields_set:
         task.title = params.title
     if 'description' in fields_set:
         task.description = params.description
     if 'priority' in fields_set:
         task.priority = params.priority
-    if 'due_date' in fields_set:
-        # If explicitly set (even to None), update it
-        # This allows removing due dates by setting them to None
-        task.due_date = params.due_date
+
+    # Phase V - US1: Handle clear_due_date flag (T046)
+    if 'clear_due_date' in fields_set and params.clear_due_date is True:
+        logger.info(f"Clearing due date for task {task.id}")
+        task.due_date = None
+        task.reminder_sent = {}
+        parsed_due_date = None
+        due_date_formatted = None
+
+    # Phase V - US1: Handle due_date as natural language (T045)
+    elif 'due_date' in fields_set:
+        if params.due_date and params.due_date.strip():
+            try:
+                parsed_due_date = parse_natural_date(params.due_date, params.user_timezone)
+                due_date_formatted = format_due_date(parsed_due_date, params.user_timezone)
+                task.due_date = parsed_due_date
+                logger.info(
+                    f"Updated due date for task {task.id}: '{params.due_date}' → {parsed_due_date} "
+                    f"(formatted: {due_date_formatted})"
+                )
+            except InvalidDateError as e:
+                logger.error(f"Invalid date '{params.due_date}': {e}")
+                raise  # Re-raise for proper error handling
+            except InvalidTimezoneError as e:
+                logger.error(f"Invalid timezone '{params.user_timezone}': {e}")
+                raise  # Re-raise for proper error handling
+        else:
+            # Empty string - treat as no change (backward compatibility)
+            parsed_due_date = task.due_date
+            if parsed_due_date:
+                due_date_formatted = format_due_date(parsed_due_date, params.user_timezone)
+
+    # Phase V - US1: Reset reminder_sent if due date changed (T039)
+    if old_due_date != task.due_date:
+        task.reminder_sent = {}
+        logger.debug(f"Reset reminder_sent for task {task.id} (due date changed)")
+
     if 'completed' in fields_set:
         task.completed = params.completed
 
     # Always update timestamp (T022)
     task.updated_at = datetime.utcnow()
+
+    # Format due_date for response if it exists but wasn't just updated
+    if task.due_date and not due_date_formatted:
+        due_date_formatted = format_due_date(task.due_date, params.user_timezone)
 
     # Persist changes
     try:
@@ -240,5 +316,6 @@ def update_task(db: Session, params: UpdateTaskParams) -> UpdateTaskResult:
         completed=task.completed,
         priority=task.priority,
         due_date=task.due_date,
+        due_date_formatted=due_date_formatted,  # Phase V - US1
         updated_at=task.updated_at
     )

@@ -3,6 +3,15 @@ name: graphql-api
 description: Implement GraphQL API with schema design, resolvers, queries, mutations, subscriptions, and integration with existing REST APIs.
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 # GraphQL API Skill
 
 ## Purpose

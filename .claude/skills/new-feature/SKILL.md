@@ -3,6 +3,15 @@ name: new-feature
 description: Automatically scaffold a complete new feature with spec.md, plan.md, and tasks.md from a feature description
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

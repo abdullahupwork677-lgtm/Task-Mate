@@ -1,0 +1,34 @@
+# Token-Efficient Skill Folder Structure
+
+.claude/skills/[skill-name]/
+├── SKILL.md (2-5KB)              # Instructions + file references + YAML frontmatter
+│   └── YAML frontmatter          # name, description, trigger_phrases, when_to_use
+│   └── Quick instructions        # Workflow steps
+│   └── File reference map        # What files to load when
+│
+├── scripts/
+│   └── tool.py (20-50KB)         # Executable automation (on-demand load)
+│       └── 4-8 commands          # check-prerequisites, setup, test, etc.
+│       └── Colored output        # success/error/warning/info
+│       └── Error handling        # Comprehensive
+│
+├── reference/                     # Documentation (on-demand load)
+│   ├── best-practices.md         # Patterns, guidelines
+│   ├── common-errors.md          # Error solutions
+│   └── patterns.md               # Advanced patterns
+│
+├── examples/                      # Code examples (on-demand load)
+│   ├── basic-usage.md            # Simple examples
+│   ├── advanced-usage.md         # Complex examples
+│   └── code-snippets.md          # Copy-paste code
+│
+└── assets/                        # Templates (on-demand load)
+    └── templates/
+        ├── template1.py          # Boilerplate code
+        ├── template2.yaml        # Config templates
+        └── template3.sh          # Script templates
+
+Token Efficiency:
+- Initial load: Only SKILL.md (~3-5KB)
+- On-demand: Load specific files when needed
+- Savings: 85-90% reduction vs embedding all content in SKILL.md

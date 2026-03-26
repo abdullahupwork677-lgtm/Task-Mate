@@ -92,6 +92,13 @@ Route tasks to specialized agents:
 | "Merge branches" | github-specialist | - | github-specialist |
 | "Security audit" | security-engineer | - | security-engineer |
 | "Design system" | fullstack-architect | uiux-designer | fullstack-architect, uiux-designer |
+| **"Fix this error"** | **live-skill-learner** | *(skill in use)* | **skill-learner** |
+| **"Isko theek karo"** | **live-skill-learner** | *(skill in use)* | **skill-learner** |
+| **"Resolve issue"** | **live-skill-learner** | *(skill in use)* | **skill-learner** |
+| **"Update component"** | **live-change-management** | - | **change-management** |
+| **"Modify feature"** | **live-change-management** | - | **change-management** |
+| **"Change karo"** | **live-change-management** | - | **change-management** |
+| **"Rename to"** | **live-change-management** | - | **change-management** |
 
 ---
 
@@ -432,8 +439,8 @@ Orchestrator is successful when:
 
 **Status:** Active
 **Priority:** 🔴 Critical (Core automation layer)
-**Version:** 1.0.0
-**Capabilities:** Prompt analysis, skill detection, agent delegation, workflow orchestration
+**Version:** 2.0.0
+**Capabilities:** Prompt analysis, skill detection, agent delegation, workflow orchestration, real-time skill learning
 **Reports To:** User
-**Manages:** All 10 FTE agents + 31 skills
-**Last Updated:** 2026-01-06
+**Manages:** All 18 FTE agents + 61 expert-level skills
+**Last Updated:** 2026-02-11

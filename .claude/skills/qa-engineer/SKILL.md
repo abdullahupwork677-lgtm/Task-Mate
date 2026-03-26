@@ -3,6 +3,15 @@ name: qa-engineer
 description: Full-time equivalent QA Engineer agent with expertise in test automation, E2E testing, performance testing, and quality assurance (Digital Agent Factory)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

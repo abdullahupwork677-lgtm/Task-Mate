@@ -20,19 +20,35 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Create the enum type
-    op.execute("CREATE TYPE priority_enum AS ENUM ('high', 'medium', 'low')")
+    # Check if we're using PostgreSQL or SQLite
+    connection = op.get_bind()
+    dialect_name = connection.dialect.name
 
-    # Add the priority column with default value
-    op.add_column(
-        'tasks',
-        sa.Column(
-            'priority',
-            sa.Enum('high', 'medium', 'low', name='priority_enum'),
-            nullable=False,
-            server_default='medium'
+    if dialect_name == "postgresql":
+        # PostgreSQL: Create enum type first
+        op.execute("CREATE TYPE priority_enum AS ENUM ('high', 'medium', 'low')")
+
+        # Add priority column with enum type
+        op.add_column(
+            'tasks',
+            sa.Column(
+                'priority',
+                sa.Enum('high', 'medium', 'low', name='priority_enum'),
+                nullable=False,
+                server_default='medium'
+            )
         )
-    )
+    else:
+        # SQLite/other databases: Use plain string column
+        op.add_column(
+            'tasks',
+            sa.Column(
+                'priority',
+                sa.String(20),
+                nullable=False,
+                server_default='medium'
+            )
+        )
 
     # Create composite index for filtering performance
     op.create_index(
@@ -50,5 +66,10 @@ def downgrade() -> None:
     # Drop the column
     op.drop_column('tasks', 'priority')
 
-    # Drop the enum type
-    op.execute('DROP TYPE priority_enum')
+    # Check if we're using PostgreSQL
+    connection = op.get_bind()
+    dialect_name = connection.dialect.name
+
+    if dialect_name == "postgresql":
+        # Only drop enum type if using PostgreSQL
+        op.execute('DROP TYPE priority_enum')

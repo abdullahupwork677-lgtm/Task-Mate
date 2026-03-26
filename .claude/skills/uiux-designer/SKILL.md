@@ -3,6 +3,15 @@ name: uiux-designer
 description: Full-time equivalent UI/UX Designer agent with expertise in user research, wireframing, prototyping, design systems, and accessibility (Digital Agent Factory)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

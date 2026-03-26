@@ -52,8 +52,8 @@ def enhance_tool_parameters(
     """
     enhanced_params = params.copy()
 
-    # Natural Language Date Parsing for add_task, update_task, and set_task_deadline
-    if tool_name in ['add_task', 'update_task', 'set_task_deadline']:
+    # Natural Language Date Parsing for add_task, update_task, set_task_deadline, and set_recurring
+    if tool_name in ['add_task', 'update_task', 'set_task_deadline', 'set_recurring']:
         # Parse due_date if present as string
         if 'due_date' in params and isinstance(params['due_date'], str):
             date_str = params['due_date']
@@ -66,6 +66,20 @@ def enhance_tool_parameters(
                 )
             else:
                 logger.warning(f"Failed to parse date: '{date_str}'")
+                # Keep original value, let tool validation handle it
+
+        # Parse end_date for set_recurring (Phase V)
+        if tool_name == 'set_recurring' and 'end_date' in params and isinstance(params['end_date'], str):
+            end_date_str = params['end_date']
+            parsed_end_date = parse_natural_date(end_date_str)
+
+            if parsed_end_date:
+                enhanced_params['end_date'] = parsed_end_date.isoformat()
+                logger.info(
+                    f"Parsed recurrence end date '{end_date_str}' → {enhanced_params['end_date']}"
+                )
+            else:
+                logger.warning(f"Failed to parse recurrence end date: '{end_date_str}'")
                 # Keep original value, let tool validation handle it
 
         # Auto-suggest priority for add_task if not provided
@@ -266,7 +280,13 @@ async def run_agent(
                     response_text = "Here are your tasks:"
                 elif tool_name == 'complete_task':
                     task_id = tool_params.get('task_id', '')
-                    response_text = f"I've marked task {task_id} as complete."
+                    # Phase V: Check if next occurrence was created
+                    next_occurrence = tool_params.get('next_occurrence')
+                    if next_occurrence:
+                        next_due = next_occurrence.get('due_date', '')
+                        response_text = f"I've marked task {task_id} as complete. The next occurrence has been created for {next_due}."
+                    else:
+                        response_text = f"I've marked task {task_id} as complete."
                 elif tool_name == 'update_task':
                     task_id = tool_params.get('task_id', '')
                     updates = []
@@ -298,6 +318,16 @@ async def run_agent(
                         response_text = f"I've updated the deadline for task {task_id}."
                     else:
                         response_text = f"I've removed the deadline from task {task_id}."
+                elif tool_name == 'set_recurring':
+                    task_id = tool_params.get('task_id', '')
+                    pattern = tool_params.get('pattern', '')
+                    end_date = tool_params.get('end_date')
+                    if pattern == 'none':
+                        response_text = f"I've stopped the recurrence for task {task_id}. It's now a one-time task."
+                    elif end_date:
+                        response_text = f"I've set task {task_id} to repeat {pattern} until {end_date}."
+                    else:
+                        response_text = f"I've set task {task_id} to repeat {pattern}."
                 else:
                     response_text = "Done! Let me know if you need anything else."
 

@@ -1,0 +1,234 @@
+{
+  "tool_name": "remove_tag",
+  "description": "Remove one or more tags from an existing task",
+  "category": "task_management",
+  "version": "1.0.0",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2026-02-14",
+      "changes": [
+        "Initial implementation for task tags feature"
+      ]
+    }
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "type": "integer",
+        "description": "ID of the task to remove tags from. Must be owned by the current user.",
+        "minimum": 1,
+        "examples": [1, 5, 42]
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "description": "Array of tags to remove. Tags will be normalized to lowercase before removal. Non-existent tags are silently ignored.",
+        "minItems": 1,
+        "examples": [
+          ["work"],
+          ["urgent", "high-priority"],
+          ["shopping", "groceries"]
+        ]
+      }
+    },
+    "required": ["task_id", "tags"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether the operation succeeded"
+      },
+      "task": {
+        "type": "object",
+        "description": "Updated task object with tags removed",
+        "properties": {
+          "id": {"type": "integer"},
+          "title": {"type": "string"},
+          "description": {"type": "string", "nullable": true},
+          "completed": {"type": "boolean"},
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Remaining tags on the task after removal"
+          },
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "tags_removed": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of tags that were actually removed (excludes non-existent tags)"
+      }
+    }
+  },
+  "natural_language_examples": [
+    {
+      "user_input": "remove tag work from task 5",
+      "intent": "Remove 'work' tag from task with ID 5",
+      "tool_call": {
+        "task_id": 5,
+        "tags": ["work"]
+      },
+      "expected_behavior": "Tag 'work' is removed from task 5. If task doesn't have 'work', operation succeeds but nothing changes."
+    },
+    {
+      "user_input": "remove tags urgent and high-priority from task 3",
+      "intent": "Remove multiple tags from task 3",
+      "tool_call": {
+        "task_id": 3,
+        "tags": ["urgent", "high-priority"]
+      },
+      "expected_behavior": "Both tags are removed from task 3 (case-insensitive)"
+    },
+    {
+      "user_input": "untag task 1",
+      "intent": "Remove tags, but unclear which ones",
+      "tool_call": "NEEDS_CLARIFICATION",
+      "note": "Agent should ask: 'Which tags would you like to remove from task 1?'"
+    },
+    {
+      "user_input": "remove all tags from task 7",
+      "intent": "Remove all tags from task",
+      "tool_call": "SPECIAL_CASE",
+      "note": "Agent should first get task tags with list_tasks, then call remove_tag with all tags"
+    }
+  ],
+  "error_handling": [
+    {
+      "error_type": "task_not_found",
+      "trigger": "Task ID does not exist or not owned by user",
+      "response": {
+        "success": false,
+        "error": "Task not found",
+        "message": "Task with ID {task_id} not found or not accessible",
+        "code": "TASK_NOT_FOUND"
+      }
+    },
+    {
+      "error_type": "tag_not_found",
+      "trigger": "Attempting to remove non-existent tag",
+      "response": {
+        "success": true,
+        "note": "Operation succeeds, but tags_removed array is empty or partial"
+      }
+    },
+    {
+      "error_type": "unauthenticated",
+      "trigger": "No valid JWT token provided",
+      "response": {
+        "success": false,
+        "error": "Unauthorized",
+        "message": "Authentication required",
+        "code": "UNAUTHORIZED"
+      }
+    }
+  ],
+  "performance_requirements": {
+    "target_response_time": "< 100ms for removing up to 5 tags",
+    "maximum_response_time": "< 500ms for removing up to 20 tags",
+    "implementation_approach": "Direct JSONB array filter in PostgreSQL"
+  },
+  "security_requirements": [
+    "User isolation: Can only remove tags from own tasks",
+    "JWT authentication required",
+    "Input validation via Pydantic schemas"
+  ],
+  "agent_prompt_guidance": {
+    "understanding_commands": [
+      "User says 'remove tag X from task N' → remove_tag(task_id=N, tags=['X'])",
+      "User says 'untag task N with X, Y' → remove_tag(task_id=N, tags=['X', 'Y'])",
+      "User says 'remove all tags from task N' → First get current tags, then remove all",
+      "Case-insensitive: 'remove Work' and 'remove work' are identical"
+    ],
+    "response_formatting": [
+      "Confirm which tags were removed: 'Removed tags 'work', 'urgent' from task \"{title}\"'",
+      "If tags didn't exist: 'Task didn't have tags: {not_found_tags}'",
+      "Show remaining tags: 'Task now has tags: {remaining_tags}' or 'Task has no tags' if empty"
+    ]
+  },
+  "implementation_notes": {
+    "backend": {
+      "file": "backend/src/mcp_tools/remove_tag.py",
+      "dependencies": [
+        "backend/src/services/task_service.py (remove_tags_from_task method)",
+        "backend/src/services/tag_service.py (normalize_tags method)"
+      ]
+    },
+    "database": {
+      "operations": [
+        "SELECT task with user_id and task_id (ownership check)",
+        "UPDATE task SET tags = filtered_tags (array filter)",
+        "Remove specified tags from array"
+      ]
+    }
+  },
+  "test_cases": [
+    {
+      "test_name": "Remove single tag from task",
+      "setup": "Task 1 has tags ['work', 'urgent']",
+      "input": {"task_id": 1, "tags": ["work"]},
+      "expected_output": {
+        "success": true,
+        "task": {"id": 1, "tags": ["urgent"]},
+        "tags_removed": ["work"]
+      }
+    },
+    {
+      "test_name": "Remove multiple tags",
+      "setup": "Task 1 has tags ['work', 'urgent', 'backend']",
+      "input": {"task_id": 1, "tags": ["work", "urgent"]},
+      "expected_output": {
+        "success": true,
+        "task": {"id": 1, "tags": ["backend"]},
+        "tags_removed": ["work", "urgent"]
+      }
+    },
+    {
+      "test_name": "Remove non-existent tag",
+      "setup": "Task 1 has tags ['work']",
+      "input": {"task_id": 1, "tags": ["shopping"]},
+      "expected_output": {
+        "success": true,
+        "tags_removed": [],
+        "note": "Operation succeeds but nothing removed"
+      }
+    },
+    {
+      "test_name": "Remove tag case-insensitively",
+      "setup": "Task 1 has tag 'work'",
+      "input": {"task_id": 1, "tags": ["Work", "WORK"]},
+      "expected_output": {
+        "success": true,
+        "tags_removed": ["work"],
+        "note": "All case variations match 'work'"
+      }
+    },
+    {
+      "test_name": "Remove all tags",
+      "setup": "Task 1 has tags ['work', 'urgent']",
+      "input": {"task_id": 1, "tags": ["work", "urgent"]},
+      "expected_output": {
+        "success": true,
+        "task": {"id": 1, "tags": []},
+        "tags_removed": ["work", "urgent"]
+      }
+    },
+    {
+      "test_name": "Remove tag from non-existent task",
+      "input": {"task_id": 99999, "tags": ["work"]},
+      "expected_output": {
+        "success": false,
+        "error": "TASK_NOT_FOUND"
+      }
+    }
+  ]
+}

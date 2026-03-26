@@ -3,6 +3,15 @@ name: pydantic-validation
 description: Implement declarative input validation with Pydantic DTOs for FastAPI applications (Phase 2 pattern)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

@@ -13,7 +13,11 @@ from unittest.mock import Mock, patch
 from datetime import datetime
 
 from src.services.intent_classifier import IntentClassifier, Intent
-from src.mcp_tools.complete_task import complete_task, CompleteTaskParams, CompleteTaskResult
+from src.mcp_tools.complete_task import (
+    complete_task,
+    CompleteTaskParams,
+    CompleteTaskResult,
+)
 from src.mcp_tools.update_task import update_task, UpdateTaskParams
 from src.mcp_tools.find_task import find_task, FindTaskParams
 
@@ -71,10 +75,7 @@ class TestCompletionByID:
 
     def test_complete_task_execution(self, mock_db, sample_task):
         """Test task completion execution."""
-        params = CompleteTaskParams(
-            user_id="user-123",
-            task_id=5
-        )
+        params = CompleteTaskParams(user_id="user-123", task_id=5)
 
         result = complete_task(mock_db, params)
 
@@ -94,10 +95,7 @@ class TestCompletionByID:
         task.updated_at = datetime.utcnow()
         mock_db.exec.return_value.first.return_value = task
 
-        params = CompleteTaskParams(
-            user_id="user-123",
-            task_id=5
-        )
+        params = CompleteTaskParams(user_id="user-123", task_id=5)
 
         result = complete_task(mock_db, params)
 
@@ -108,10 +106,7 @@ class TestCompletionByID:
         """Test completing a task that doesn't exist."""
         mock_db.exec.return_value.first.return_value = None
 
-        params = CompleteTaskParams(
-            user_id="user-123",
-            task_id=99999
-        )
+        params = CompleteTaskParams(user_id="user-123", task_id=99999)
 
         with pytest.raises(ValueError, match="Task not found"):
             complete_task(mock_db, params)
@@ -136,8 +131,10 @@ class TestNaturalLanguageCompletion:
         result = classifier.classify("I finished buying milk")
         assert result.intent_type == Intent.COMPLETE_TASK
         # Should extract task name for fuzzy matching
-        assert "buying milk" in str(result.extracted_entities).lower() or \
-               result.extracted_entities.get("task_name") is not None
+        assert (
+            "buying milk" in str(result.extracted_entities).lower()
+            or result.extracted_entities.get("task_name") is not None
+        )
 
     def test_done_with_pattern(self, classifier):
         """Test 'done with X' pattern."""
@@ -188,10 +185,7 @@ class TestCompletionByName:
         mock_db.exec.return_value.all.return_value = [task]
 
         # Find task by name
-        find_params = FindTaskParams(
-            user_id="user-123",
-            title="groceries"
-        )
+        find_params = FindTaskParams(user_id="user-123", title="groceries")
 
         # Would use find_task to locate, then complete_task to mark done
 
@@ -218,11 +212,7 @@ class TestCompletionToggle:
     def test_uncomplete_intent_detection(self, classifier):
         """Test uncomplete intent detection."""
         # These may not be recognized by current classifier
-        tests = [
-            "mark task 5 as incomplete",
-            "uncomplete task 5",
-            "task 5 is not done"
-        ]
+        tests = ["mark task 5 as incomplete", "uncomplete task 5", "task 5 is not done"]
         for test in tests:
             result = classifier.classify(test)
             # Just verify no crash - may be UNKNOWN
@@ -242,9 +232,7 @@ class TestCompletionToggle:
 
         # Use update_task to toggle completion
         params = UpdateTaskParams(
-            user_id="user-123",
-            task_id=5,
-            completed=False  # Toggle to incomplete
+            user_id="user-123", task_id=5, completed=False  # Toggle to incomplete
         )
 
         result = update_task(mock_db, params)
@@ -297,10 +285,7 @@ class TestCompletionUserIsolation:
         """Test that user cannot complete another user's task."""
         mock_db.exec.return_value.first.return_value = None
 
-        params = CompleteTaskParams(
-            user_id="user-456",  # Different user
-            task_id=5
-        )
+        params = CompleteTaskParams(user_id="user-456", task_id=5)  # Different user
 
         with pytest.raises(ValueError, match="Task not found"):
             complete_task(mock_db, params)
@@ -316,10 +301,7 @@ class TestCompletionUserIsolation:
         task.updated_at = datetime.utcnow()
         mock_db.exec.return_value.first.return_value = task
 
-        params = CompleteTaskParams(
-            user_id="user-123",
-            task_id=5
-        )
+        params = CompleteTaskParams(user_id="user-123", task_id=5)
 
         result = complete_task(mock_db, params)
         assert result.completed is True
@@ -348,10 +330,7 @@ class TestCompletionEdgeCases:
         """Test completing task with ID 0."""
         mock_db.exec.return_value.first.return_value = None
 
-        params = CompleteTaskParams(
-            user_id="user-123",
-            task_id=0
-        )
+        params = CompleteTaskParams(user_id="user-123", task_id=0)
 
         with pytest.raises(ValueError, match="Task not found"):
             complete_task(mock_db, params)
@@ -360,10 +339,7 @@ class TestCompletionEdgeCases:
         """Test completing task with negative ID."""
         mock_db.exec.return_value.first.return_value = None
 
-        params = CompleteTaskParams(
-            user_id="user-123",
-            task_id=-1
-        )
+        params = CompleteTaskParams(user_id="user-123", task_id=-1)
 
         with pytest.raises(ValueError, match="Task not found"):
             complete_task(mock_db, params)
@@ -380,10 +356,7 @@ class TestCompletionEdgeCases:
         task.updated_at = old_time
         mock_db.exec.return_value.first.return_value = task
 
-        params = CompleteTaskParams(
-            user_id="user-123",
-            task_id=5
-        )
+        params = CompleteTaskParams(user_id="user-123", task_id=5)
 
         result = complete_task(mock_db, params)
 
@@ -401,10 +374,7 @@ class TestCompletionEdgeCases:
         task.updated_at = datetime.utcnow()
         mock_db.exec.return_value.first.return_value = task
 
-        params = CompleteTaskParams(
-            user_id="user-123",
-            task_id=5
-        )
+        params = CompleteTaskParams(user_id="user-123", task_id=5)
 
         result = complete_task(mock_db, params)
 

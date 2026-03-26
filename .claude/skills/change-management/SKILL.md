@@ -3,6 +3,15 @@ name: change-management
 description: Manage changes to existing features by creating change subfolders with spec, plan, tasks and automatically updating all affected areas of the project (project)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

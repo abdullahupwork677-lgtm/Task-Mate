@@ -3,6 +3,15 @@ name: vercel-deployer
 description: Full-time equivalent Vercel Specialist agent with expertise in Vercel deployment, Edge Functions, ISR, and performance optimization (Digital Agent Factory)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

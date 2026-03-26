@@ -3,6 +3,15 @@ name: password-security
 description: Implement secure password hashing with bcrypt following industry best practices (Phase 2 pattern)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

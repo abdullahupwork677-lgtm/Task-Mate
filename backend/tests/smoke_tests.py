@@ -105,7 +105,7 @@ class SmokeTestRunner:
 
             # For now, we'll simulate by creating a token manually
             # In production, you'd call POST /api/auth/login
-            from src.auth.jwt import create_access_token
+            from src.auth import create_access_token
 
             self.jwt_token = create_access_token(data={"sub": self.test_user_id})
             self.log("Test JWT token created", "INFO")

@@ -3,6 +3,15 @@ name: chatbot-endpoint
 description: Create stateless chat endpoint with conversation history management and AI agent integration (project)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

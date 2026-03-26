@@ -3,6 +3,15 @@ name: observability-apm
 description: Implement Application Performance Monitoring (APM), distributed tracing, and observability using tools like OpenTelemetry, Prometheus, Grafana, and Jaeger.
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 # Observability & APM Skill
 
 ## Purpose

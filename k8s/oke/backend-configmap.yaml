@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: todo-app
+data:
+  # Application settings
+  APP_NAME: "Todo API"
+  DEBUG: "false"
+  API_V1_PREFIX: "/api"
+
+  # Database connection pool
+  DB_POOL_SIZE: "10"
+  DB_MAX_OVERFLOW: "20"
+  DB_POOL_TIMEOUT: "30"
+
+  # CORS settings (allow all for now, restrict in production)
+  CORS_ORIGINS: "*"
+
+  # OpenAI settings
+  OPENAI_AGENT_MODEL: "gpt-4o"
+
+  # JWT settings
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRY_DAYS: "7"

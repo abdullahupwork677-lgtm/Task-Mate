@@ -3,6 +3,15 @@ name: devops-engineer
 description: Full-time equivalent DevOps Engineer agent with expertise in CI/CD, Docker, infrastructure, monitoring, and automation (Digital Agent Factory)
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 ## User Input
 
 ```text

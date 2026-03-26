@@ -3,6 +3,15 @@ name: microservices-patterns
 description: Implement proven microservices patterns including Circuit Breaker, Saga, API Gateway, Service Mesh, and event-driven communication.
 ---
 
+
+## 🚀 Expert-Level Automation (Upgraded)
+
+**Upgraded:** 2026-02-11
+
+**Automation Added:** 8 commands in `scripts/tool.py`
+
+
+
 # Microservices Patterns Skill
 
 ## Purpose

@@ -23,6 +23,7 @@ from ..mcp_tools.complete_task import complete_task, CompleteTaskParams
 from ..mcp_tools.update_task import update_task, UpdateTaskParams
 from ..mcp_tools.delete_task import delete_task, DeleteTaskParams
 from ..mcp_tools.find_task import find_task, FindTaskParams
+from ..mcp_tools.set_reminder import set_reminder, SetReminderParams
 from ..utils.performance import log_execution_time, track_performance
 import logging
 import json
@@ -2073,6 +2074,130 @@ async def chat(
                         tool_errors.append({"tool": "find_task", "error": str(e)})
                         executed_tools.append({
                             'tool': 'find_task',
+                            'params': tool_params,
+                            'result': {'error': str(e)}
+                        })
+                        # Continue even if tool fails
+
+                elif tool_name == 'set_reminder':
+                    # Execute set_reminder tool (Phase V - US4)
+                    try:
+                        logger.info(
+                            f"Executing set_reminder for user {user_id}",
+                            extra={
+                                "user_id": user_id,
+                                "task_id": tool_params.get('task_id'),
+                                "remind_before_natural": tool_params.get('remind_before_natural')
+                            }
+                        )
+
+                        params = SetReminderParams(
+                            task_id=tool_params.get('task_id'),
+                            remind_before_natural=tool_params.get('remind_before_natural'),
+                            user_id=user_id
+                        )
+                        result = set_reminder(params, db)
+
+                        logger.info(
+                            f"set_reminder succeeded: task_id={tool_params.get('task_id')}, "
+                            f"intervals={result.intervals}",
+                            extra={
+                                "user_id": user_id,
+                                "task_id": tool_params.get('task_id'),
+                                "intervals": result.intervals,
+                                "reminder_times": result.reminder_times
+                            }
+                        )
+
+                        executed_tools.append({
+                            'tool': 'set_reminder',
+                            'params': tool_params,
+                            'result': {
+                                'success': result.success,
+                                'message': result.message,
+                                'intervals': result.intervals,
+                                'reminder_times': result.reminder_times,
+                                'warning': result.warning
+                            }
+                        })
+                    except Exception as e:
+                        logger.error(
+                            f"set_reminder failed for task_id={tool_params.get('task_id')}: {str(e)}",
+                            extra={
+                                "user_id": user_id,
+                                "task_id": tool_params.get('task_id'),
+                                "error_type": type(e).__name__
+                            },
+                            exc_info=True
+                        )
+                        tool_errors.append({"tool": "set_reminder", "error": str(e)})
+                        executed_tools.append({
+                            'tool': 'set_reminder',
+                            'params': tool_params,
+                            'result': {'error': str(e)}
+                        })
+                        # Continue even if tool fails
+
+                elif tool_name == 'update_notification_preferences':
+                    # Execute update_notification_preferences tool (Phase V - US5)
+                    try:
+                        logger.info(
+                            f"Executing update_notification_preferences for user {user_id}",
+                            extra={
+                                "user_id": user_id,
+                                "email": tool_params.get('email'),
+                                "push": tool_params.get('push'),
+                                "in_app": tool_params.get('in_app')
+                            }
+                        )
+
+                        from ..mcp_tools.update_notification_preferences import (
+                            update_notification_preferences,
+                            UpdateNotificationPreferencesParams
+                        )
+
+                        params = UpdateNotificationPreferencesParams(
+                            user_id=user_id,
+                            email=tool_params.get('email'),
+                            push=tool_params.get('push'),
+                            in_app=tool_params.get('in_app')
+                        )
+                        result = update_notification_preferences(params, db)
+
+                        logger.info(
+                            f"update_notification_preferences succeeded: "
+                            f"email={result.email}, push={result.push}, in_app={result.in_app}",
+                            extra={
+                                "user_id": user_id,
+                                "email": result.email,
+                                "push": result.push,
+                                "in_app": result.in_app
+                            }
+                        )
+
+                        executed_tools.append({
+                            'tool': 'update_notification_preferences',
+                            'params': tool_params,
+                            'result': {
+                                'success': result.success,
+                                'message': result.message,
+                                'email': result.email,
+                                'push': result.push,
+                                'in_app': result.in_app
+                            }
+                        })
+                    except Exception as e:
+                        logger.error(
+                            f"update_notification_preferences failed: {str(e)}",
+                            extra={
+                                "user_id": user_id,
+                                "error_type": type(e).__name__
+                            },
+                            exc_info=True
+                        )
+                        tool_errors.append({"tool": "update_notification_preferences", "error": str(e)})
+                        executed_tools.append({
+                            'tool': 'update_notification_preferences',
                             'params': tool_params,
                             'result': {'error': str(e)}
                         })
