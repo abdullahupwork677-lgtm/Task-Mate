@@ -11,6 +11,7 @@ import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, and_
+from sqlalchemy import text
 from pydantic import BaseModel
 
 from src.db import get_session
@@ -119,9 +120,40 @@ def get_in_app_notifications(
         f"limit={limit}, unread_only={unread_only}"
     )
 
-    # Placeholder: Return empty list
-    # TODO: Implement actual database query when notification service is integrated
-    return []
+    try:
+        query = """
+            SELECT id, user_id, task_id, title, message, reminder_type,
+                   is_read, created_at, event_id
+            FROM notification_logs
+            WHERE user_id = :user_id AND channel = 'in_app'
+            {unread_filter}
+            ORDER BY created_at DESC
+            LIMIT :limit
+        """.format(unread_filter="AND is_read = false" if unread_only else "")
+
+        rows = db.execute(
+            text(query),
+            {"user_id": user_id, "limit": limit}
+        ).fetchall()
+
+        result = []
+        for row in rows:
+            result.append(InAppNotificationResponse(
+                id=row[0],
+                user_id=str(row[1]),
+                task_id=row[2],
+                title=row[3] or "Reminder",
+                message=row[4] or "",
+                reminder_type=row[5] or "",
+                is_read=row[6] or False,
+                created_at=str(row[7]),
+                event_id=str(row[8]),
+            ))
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to fetch in-app notifications: {e}", exc_info=True)
+        return []
 
 
 @router.patch("/{user_id}/notifications/{notification_id}/read")
@@ -208,9 +240,21 @@ def mark_notification_as_read(
         f"Marking notification {notification_id} as read for user {user_id}"
     )
 
-    # Placeholder: Return success
-    # TODO: Implement actual database update when notification service is integrated
-    return {
-        "success": True,
-        "message": "Notification marked as read"
-    }
+    try:
+        result = db.execute(
+            text("""
+                UPDATE notification_logs
+                SET is_read = true
+                WHERE id = :id AND user_id = :user_id AND channel = 'in_app'
+            """),
+            {"id": notification_id, "user_id": user_id}
+        )
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Notification not found")
+        return {"success": True, "message": "Notification marked as read"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to mark notification as read: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update notification")

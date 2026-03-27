@@ -7,11 +7,13 @@ User Story 2: 24-Hour Advance Reminder
 """
 
 import time
+import uuid
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
+from sqlalchemy import text
 
 from src.db import get_session
 from src.services.reminder_service import get_tasks_needing_reminders, should_send_reminder
@@ -154,12 +156,46 @@ async def reminder_check_endpoint(
                             # T152: Determine notification channels from user preferences
                             channels = _get_enabled_channels(task.user_id, db)
 
-                            # Publish event to Kafka
-                            event_id = await publish_reminder_event(
-                                task=task,
-                                reminder_type=interval,
-                                channels=channels
-                            )
+                            # Generate event_id for idempotency
+                            event_id = str(uuid.uuid4())
+
+                            # Save in-app notification directly to DB (no Kafka consumer needed)
+                            if "in_app" in channels:
+                                notif_title = f"⏰ Reminder: {task.title}"
+                                notif_msg = (
+                                    f"Task '{task.title}' is due in {interval}. "
+                                    f"Due: {task.due_date.strftime('%b %d, %Y %H:%M') if task.due_date else 'soon'}."
+                                )
+                                try:
+                                    db.execute(text("""
+                                        INSERT INTO notification_logs
+                                            (task_id, user_id, reminder_type, channel, status,
+                                             title, message, is_read, event_id, sent_at, created_at)
+                                        VALUES
+                                            (:task_id, :user_id, :reminder_type, 'in_app', 'success',
+                                             :title, :message, false, :event_id, NOW(), NOW())
+                                        ON CONFLICT (event_id) DO NOTHING
+                                    """), {
+                                        "task_id": task.id,
+                                        "user_id": str(task.user_id),
+                                        "reminder_type": interval,
+                                        "title": notif_title,
+                                        "message": notif_msg,
+                                        "event_id": event_id,
+                                    })
+                                    logger.info(f"In-app notification saved for task {task.id}")
+                                except Exception as db_err:
+                                    logger.warning(f"Failed to save in-app notification: {db_err}")
+
+                            # Publish to Kafka (best-effort — don't block on failure)
+                            try:
+                                await publish_reminder_event(
+                                    task=task,
+                                    reminder_type=interval,
+                                    channels=channels
+                                )
+                            except Exception as kafka_err:
+                                logger.warning(f"Kafka publish failed (non-critical): {kafka_err}")
 
                             # T082: Update task.reminder_sent field
                             if not task.reminder_sent:

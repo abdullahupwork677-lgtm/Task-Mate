@@ -1,14 +1,82 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
+import { getToken, getUserIdFromToken } from '@/lib/auth';
+
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  reminder_type: string;
+  is_read: boolean;
+  created_at: string;
+}
 
 export function Header() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    try {
+      const token = getToken();
+      const userId = getUserIdFromToken();
+      if (!token || !userId) return;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/users/${userId}/notifications?limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+      }
+    } catch (_) {}
+  };
+
+  const markAsRead = async (id: number) => {
+    try {
+      const token = getToken();
+      const userId = getUserIdFromToken();
+      if (!token || !userId) return;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      await fetch(`${apiUrl}/api/users/${userId}/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (_) {}
+  };
+
+  const markAllRead = async () => {
+    notifications.filter(n => !n.is_read).forEach(n => markAsRead(n.id));
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll every 30 seconds for new notifications
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Close notification panel on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Load theme from localStorage on mount
   useEffect(() => {
@@ -79,8 +147,64 @@ export function Header() {
             </div>
           </div>
 
-          {/* Right side: Theme toggle + User menu */}
+          {/* Right side: Notifications + Theme toggle + User menu */}
           <div className="flex items-center gap-4">
+            {/* Notification Bell */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) fetchNotifications(); }}
+                className="relative p-2 rounded-lg transition-colors duration-200"
+                style={{ backgroundColor: theme === 'light' ? '#f1f5f9' : '#1e293b' }}
+                aria-label="Notifications"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" style={{ color: theme === 'light' ? '#475569' : '#94a3b8' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 rounded-xl shadow-2xl border z-50 overflow-hidden" style={{ backgroundColor: theme === 'light' ? '#ffffff' : '#1e293b', borderColor: theme === 'light' ? '#e2e8f0' : '#334155' }}>
+                  <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: theme === 'light' ? '#e2e8f0' : '#334155' }}>
+                    <h3 className="font-semibold text-sm" style={{ color: theme === 'light' ? '#0f172a' : '#f1f5f9' }}>Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} className="text-xs text-blue-400 hover:text-blue-300">Mark all read</button>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm" style={{ color: theme === 'light' ? '#94a3b8' : '#64748b' }}>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <div
+                          key={n.id}
+                          onClick={() => !n.is_read && markAsRead(n.id)}
+                          className="px-4 py-3 border-b cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{
+                            borderColor: theme === 'light' ? '#f1f5f9' : '#334155',
+                            backgroundColor: n.is_read ? 'transparent' : (theme === 'light' ? '#eff6ff' : '#1e3a5f'),
+                          }}
+                        >
+                          <p className="text-sm font-medium" style={{ color: theme === 'light' ? '#0f172a' : '#f1f5f9' }}>{n.title}</p>
+                          <p className="text-xs mt-0.5" style={{ color: theme === 'light' ? '#64748b' : '#94a3b8' }}>{n.message}</p>
+                          <p className="text-xs mt-1 opacity-60" style={{ color: theme === 'light' ? '#94a3b8' : '#64748b' }}>
+                            {new Date(n.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
