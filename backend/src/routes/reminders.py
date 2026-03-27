@@ -225,3 +225,23 @@ async def reminder_check_endpoint(
         "errors": errors if len(errors) > 0 else None,
         "timestamp": current_time.isoformat()
     }
+
+
+# Dapr cron binding calls POST /<binding-name> — binding name is "reminder-check-cron"
+# so we need this route at the app root level (not under /api/internal/dapr prefix)
+from fastapi import APIRouter as _APIRouter
+
+dapr_cron_router = _APIRouter(tags=["dapr-cron"])
+
+
+@dapr_cron_router.post("/reminder-check-cron")
+async def dapr_cron_reminder_trigger(
+    db: Session = Depends(get_session)
+):
+    """Dapr cron binding entry point.
+
+    Dapr calls POST /<binding-name> on the app port.
+    Binding name = reminder-check-cron → POST /reminder-check-cron
+    This simply delegates to the main reminder_check_endpoint logic.
+    """
+    return await reminder_check_endpoint(db=db)

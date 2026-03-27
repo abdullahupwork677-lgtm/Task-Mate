@@ -40,6 +40,7 @@ app.include_router(chat.router, prefix=settings.api_v1_prefix)
 app.include_router(conversations.router)
 app.include_router(voice.router)
 app.include_router(reminders.router)  # Internal Dapr endpoints
+app.include_router(reminders.dapr_cron_router)  # Dapr cron binding: POST /reminder-check-cron
 app.include_router(notification_preferences.router)  # Phase V - US5: Notification preferences
 app.include_router(in_app_notifications.router)  # Phase V - US5: In-app notifications
 app.include_router(metrics.router)  # Phase V - T188: Prometheus metrics
