@@ -24,14 +24,14 @@ export function getUserIdFromToken(): string | null {
   if (!token) return null;
 
   try {
-    // JWT is in format: header.payload.signature
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
-    // Decode the payload (base64url)
-    const payload = JSON.parse(atob(parts[1]));
+    // JWT uses base64url: replace URL-safe chars and add padding
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+    const payload = JSON.parse(atob(padded));
 
-    // JWT typically has 'sub' (subject) field containing user ID
     return payload.sub || payload.user_id || payload.id || null;
   } catch (error) {
     console.error('Failed to decode JWT:', error);
