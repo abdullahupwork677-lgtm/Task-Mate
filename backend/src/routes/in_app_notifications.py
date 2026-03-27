@@ -16,7 +16,6 @@ from pydantic import BaseModel
 
 from src.db import get_session
 from src.auth import get_current_user
-from src.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ def get_in_app_notifications(
     user_id: str,
     limit: int = 50,
     unread_only: bool = False,
-    current_user: User = Depends(get_current_user),
+    current_user: str = Depends(get_current_user),
     db: Session = Depends(get_session)
 ) -> List[InAppNotificationResponse]:
     """Get user's in-app notifications (T160).
@@ -60,7 +59,7 @@ def get_in_app_notifications(
         user_id: User ID to fetch notifications for
         limit: Maximum number of notifications to return (default: 50)
         unread_only: If True, only return unread notifications
-        current_user: Authenticated user (from JWT)
+        current_user: Authenticated user_id string (from JWT)
         db: Database session
 
     Returns:
@@ -68,22 +67,16 @@ def get_in_app_notifications(
 
     Raises:
         HTTPException 403: If user_id doesn't match authenticated user
-        HTTPException 404: If user not found
     """
-    # User isolation: Only allow users to access their own notifications
-    if current_user.id != user_id:
+    # User isolation: current_user is the user_id string returned by get_current_user
+    if current_user != user_id:
         logger.warning(
-            f"User {current_user.id} attempted to access notifications for user {user_id}"
+            f"User {current_user} attempted to access notifications for user {user_id}"
         )
         raise HTTPException(
             status_code=403,
             detail="You can only access your own notifications"
         )
-
-    # Fetch user from database
-    user = db.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
 
     # T160: Query in-app notifications
     # Note: InAppNotification table is in notification service database
@@ -160,7 +153,7 @@ def get_in_app_notifications(
 def mark_notification_as_read(
     user_id: str,
     notification_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: str = Depends(get_current_user),
     db: Session = Depends(get_session)
 ) -> dict:
     """Mark in-app notification as read (T162).
@@ -168,7 +161,7 @@ def mark_notification_as_read(
     Args:
         user_id: User ID
         notification_id: Notification ID to mark as read
-        current_user: Authenticated user (from JWT)
+        current_user: Authenticated user_id string (from JWT)
         db: Database session
 
     Returns:
@@ -178,10 +171,10 @@ def mark_notification_as_read(
         HTTPException 403: If user_id doesn't match authenticated user
         HTTPException 404: If notification not found or doesn't belong to user
     """
-    # User isolation: Only allow users to update their own notifications
-    if current_user.id != user_id:
+    # User isolation: current_user is the user_id string returned by get_current_user
+    if current_user != user_id:
         logger.warning(
-            f"User {current_user.id} attempted to update notification for user {user_id}"
+            f"User {current_user} attempted to update notification for user {user_id}"
         )
         raise HTTPException(
             status_code=403,
