@@ -222,6 +222,9 @@ class IntentDetector:
         if has_implicit_update:
             # Check if there's a task in context from recent conversation
             context_task_id = self._get_context_task_id(conversation_history)
+            # Also try extracting task ID directly from the current message
+            if not context_task_id:
+                context_task_id = self._extract_task_id(message)
             if context_task_id:
                 logger.info(f"Detected implicit update for task #{context_task_id} from message: '{message[:50]}...'")
                 # Treat this as an update intent - route to _detect_update_intent
@@ -236,13 +239,14 @@ class IntentDetector:
         if self._matches_any_pattern(message, self.DELETE_PATTERNS):
             return self._detect_delete_intent(message, message_lower, conversation_history)
 
-        # STEP 4: Check for COMPLETE intent
-        if self._matches_any_pattern(message, self.COMPLETE_PATTERNS):
-            return self._detect_complete_intent(message, message_lower, conversation_history)
-
-        # STEP 5: Check for INCOMPLETE intent
+        # STEP 4: Check for INCOMPLETE intent FIRST (before COMPLETE to avoid false match
+        # on "incomplete" which contains the substring "complete")
         if self._matches_any_pattern(message, self.INCOMPLETE_PATTERNS):
             return self._detect_incomplete_intent(message, message_lower, conversation_history)
+
+        # STEP 5: Check for COMPLETE intent
+        if self._matches_any_pattern(message, self.COMPLETE_PATTERNS):
+            return self._detect_complete_intent(message, message_lower, conversation_history)
 
         # STEP 6: Check for ADD intent
         if self._matches_any_pattern(message, self.ADD_PATTERNS):
@@ -397,19 +401,40 @@ class IntentDetector:
                                     elif 'today' in message_lower:
                                         params['due_date'] = 'today'
                                     else:
-                                        # Try to extract date with optional time - handles "Feb 6, 2026 3 PM" format
-                                        date_patterns = [
-                                            r'(\w+\s+\d{1,2},?\s+\d{4}(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)',  # "Feb 6, 2026 3 PM"
-                                            r'(\d{1,2}\s+\w+\s+\d{4}(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)',  # "6 Feb 2026 3 PM"
-                                            r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',  # "02/06/2026"
-                                            r'(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?)?)',  # ISO format
-                                        ]
-                                        for date_pattern in date_patterns:
-                                            date_match = re.search(date_pattern, message_lower, re.IGNORECASE)
-                                            if date_match:
-                                                params['due_date'] = date_match.group(1).strip()
-                                                logger.info(f"Follow-up: Extracted due_date '{params['due_date']}' from fallback pattern")
-                                                break
+                                        # "next friday", "this monday", etc.
+                                        rel_day = re.search(
+                                            r'\b((?:next|this|coming)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))',
+                                            message_lower
+                                        )
+                                        if rel_day:
+                                            params['due_date'] = rel_day.group(1).strip()
+                                            logger.info(f"Follow-up: Extracted due_date '{params['due_date']}' from relative day")
+                                        elif 'next week' in message_lower:
+                                            params['due_date'] = 'next week'
+                                        elif 'next month' in message_lower:
+                                            params['due_date'] = 'next month'
+                                        else:
+                                            bare_day = re.search(
+                                                r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
+                                                message_lower
+                                            )
+                                            if bare_day:
+                                                params['due_date'] = bare_day.group(1).strip()
+                                                logger.info(f"Follow-up: Extracted due_date '{params['due_date']}' from bare day name")
+                                            else:
+                                                # Try to extract date with optional time - handles "Feb 6, 2026 3 PM" format
+                                                date_patterns = [
+                                                    r'(\w+\s+\d{1,2},?\s+\d{4}(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)',  # "Feb 6, 2026 3 PM"
+                                                    r'(\d{1,2}\s+\w+\s+\d{4}(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)',  # "6 Feb 2026 3 PM"
+                                                    r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',  # "02/06/2026"
+                                                    r'(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?)?)',  # ISO format
+                                                ]
+                                                for date_pattern in date_patterns:
+                                                    date_match = re.search(date_pattern, message_lower, re.IGNORECASE)
+                                                    if date_match:
+                                                        params['due_date'] = date_match.group(1).strip()
+                                                        logger.info(f"Follow-up: Extracted due_date '{params['due_date']}' from fallback pattern")
+                                                        break
                             
                             # Extract description
                             desc_match = re.search(r'description:?\s+(.+?)(?:,|\s+and|title|priority|deadline|due\s+date|mark|incomplete|complete|$)', message_lower, re.IGNORECASE)
@@ -504,7 +529,8 @@ class IntentDetector:
                     operation = None
                     if 'update' in assistant_msg or 'change' in assistant_msg:
                         operation = 'update_ask'
-                    elif 'delete' in assistant_msg or 'remove' in assistant_msg:
+                    elif ('delete task' in assistant_msg or 'remove task' in assistant_msg
+                          or 'delete the task' in assistant_msg or 'remove the task' in assistant_msg):
                         operation = 'delete'
                     elif 'complete' in assistant_msg and 'incomplete' not in assistant_msg:
                         operation = 'complete'
@@ -606,7 +632,8 @@ class IntentDetector:
                     operation = None
                     params = {}
                     
-                    if 'delete' in content or 'remove' in content:
+                    if ('delete task' in content or 'remove task' in content
+                            or 'delete the task' in content or 'remove the task' in content):
                         operation = 'delete'
                     elif 'update' in content or 'change' in content or 'edit' in content:
                         operation = 'update'
@@ -1104,14 +1131,14 @@ class IntentDetector:
             ('title' in message_lower and ('to' in message_lower or ':' in message_lower)),
             re.search(r'\b(mark\s+)?(?:it\s+)?(?:as\s+)?(?:incomplete|pending|undone|not\s+done)\b', message_lower) is not None,
             re.search(r'\b(mark\s+)?(?:it\s+)?(?:as\s+)?complete(d)?\b|\bdone\b', message_lower) is not None,
-            # Stronger patterns for title change without "title" keyword
-            re.search(r'\\bchange\\b.*\\btitle\\b', message_lower) is not None,
-            re.search(r'\\bset\\b.*\\bpriority\\b', message_lower) is not None,
-            'priority' in message_lower,
-            'deadline' in message_lower or 'due date' in message_lower or 'due_date' in message_lower,
-            'description' in message_lower,
-            ('title' in message_lower and ('to' in message_lower or ':' in message_lower)),
             'remove' in message_lower and ('deadline' in message_lower or 'due date' in message_lower),
+            # Day-of-week / relative date expressions imply a due_date update
+            re.search(r'\b(?:next|this|coming)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', message_lower) is not None,
+            re.search(r'\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', message_lower) is not None,
+            'tomorrow' in message_lower,
+            'today' in message_lower,
+            'next week' in message_lower,
+            'next month' in message_lower,
         ])
 
         if not has_update_details:
@@ -1198,21 +1225,42 @@ class IntentDetector:
                     params['due_date'] = 'tomorrow'
                 elif 'today' in message_lower:
                     params['due_date'] = 'today'
-                # Try to extract date with optional time - handles "Feb 6, 2026 3 PM" format
                 else:
-                    # Pattern for dates with optional time: "Feb 6, 2026 3 PM" or "Feb 6, 2026" or "2026-02-06T15:00"
-                    date_patterns = [
-                        r'(\w+\s+\d{1,2},?\s+\d{4}(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)',  # "Feb 6, 2026 3 PM"
-                        r'(\d{1,2}\s+\w+\s+\d{4}(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)',  # "6 Feb 2026 3 PM"
-                        r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',  # "02/06/2026"
-                        r'(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?)?)',  # ISO format
-                    ]
-                    for date_pattern in date_patterns:
-                        date_match = re.search(date_pattern, message_lower, re.IGNORECASE)
-                        if date_match:
-                            params['due_date'] = date_match.group(1).strip()
-                            logger.info(f"Extracted due_date from fallback pattern: '{params['due_date']}'")
-                            break
+                    # "next friday", "this monday", "coming tuesday", etc.
+                    relative_day_match = re.search(
+                        r'\b((?:next|this|coming)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))',
+                        message_lower
+                    )
+                    if relative_day_match:
+                        params['due_date'] = relative_day_match.group(1).strip()
+                        logger.info(f"Extracted due_date from relative day pattern: '{params['due_date']}'")
+                    elif 'next week' in message_lower:
+                        params['due_date'] = 'next week'
+                    elif 'next month' in message_lower:
+                        params['due_date'] = 'next month'
+                    else:
+                        # Bare day name: "update task 5 due date to friday"
+                        bare_day_match = re.search(
+                            r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
+                            message_lower
+                        )
+                        if bare_day_match:
+                            params['due_date'] = bare_day_match.group(1).strip()
+                            logger.info(f"Extracted due_date from bare day name: '{params['due_date']}'")
+                    # Try to extract date with optional time - handles "Feb 6, 2026 3 PM" format
+                    if 'due_date' not in params:
+                        date_patterns = [
+                            r'(\w+\s+\d{1,2},?\s+\d{4}(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)',  # "Feb 6, 2026 3 PM"
+                            r'(\d{1,2}\s+\w+\s+\d{4}(?:\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))?)',  # "6 Feb 2026 3 PM"
+                            r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',  # "02/06/2026"
+                            r'(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?)?)',  # ISO format
+                        ]
+                        for date_pattern in date_patterns:
+                            date_match = re.search(date_pattern, message_lower, re.IGNORECASE)
+                            if date_match:
+                                params['due_date'] = date_match.group(1).strip()
+                                logger.info(f"Extracted due_date from fallback pattern: '{params['due_date']}'")
+                                break
 
         # Extract description
         description_match = re.search(
