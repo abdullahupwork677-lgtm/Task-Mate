@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { getToken, getUserIdFromToken } from '@/lib/auth';
+import { getToken } from '@/lib/auth';
 
 interface Notification {
   id: number;
@@ -25,11 +25,11 @@ export function Header() {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  // Fetch notifications
+  // Fetch notifications using user.id from auth context (no JWT decode needed)
   const fetchNotifications = async () => {
     try {
       const token = getToken();
-      const userId = getUserIdFromToken();
+      const userId = user?.id;
       if (!token || !userId) return;
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
       const res = await fetch(`${apiUrl}/api/users/${userId}/notifications?limit=20`, {
@@ -45,7 +45,7 @@ export function Header() {
   const markAsRead = async (id: number) => {
     try {
       const token = getToken();
-      const userId = getUserIdFromToken();
+      const userId = user?.id;
       if (!token || !userId) return;
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
       await fetch(`${apiUrl}/api/users/${userId}/notifications/${id}/read`, {
@@ -60,12 +60,13 @@ export function Header() {
     notifications.filter(n => !n.is_read).forEach(n => markAsRead(n.id));
   };
 
+  // Fetch when user is loaded, then poll every 30s
   useEffect(() => {
+    if (!user?.id) return;
     fetchNotifications();
-    // Poll every 30 seconds for new notifications
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]);
 
   // Close notification panel on outside click
   useEffect(() => {
