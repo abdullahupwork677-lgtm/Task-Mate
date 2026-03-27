@@ -82,12 +82,15 @@ def calculate_reminder_time(due_date: datetime, interval: str) -> datetime:
         >>> calculate_reminder_time(due, "24h")
         datetime(2026, 2, 10, 17, 0, 0, tzinfo=ZoneInfo("UTC"))
     """
+    # Ensure due_date is timezone-aware before arithmetic (treat naive as UTC)
+    if due_date.tzinfo is None:
+        due_date = due_date.replace(tzinfo=ZoneInfo("UTC"))
+
     delta = parse_interval_to_timedelta(interval)
     reminder_time = due_date - delta
 
-    # Ensure reminder_time is timezone-aware (inherit from due_date or default to UTC)
+    # reminder_time inherits tzinfo from due_date (always UTC-aware now)
     if reminder_time.tzinfo is None:
-        from zoneinfo import ZoneInfo
         reminder_time = reminder_time.replace(tzinfo=ZoneInfo("UTC"))
 
     logger.debug(
@@ -206,7 +209,9 @@ def get_tasks_needing_reminders(
             and_(
                 Task.completed == False,  # Index column 1
                 Task.due_date.is_not(None),  # Filter NULL due dates
-                Task.due_date > current_time,  # Only future tasks
+                # Compare naive DB timestamp (treated as UTC) vs current UTC
+                # Strip timezone from current_time for safe comparison
+                Task.due_date > current_time.replace(tzinfo=None),
             )
         )
         .order_by(Task.due_date)  # Order by due date for efficient processing

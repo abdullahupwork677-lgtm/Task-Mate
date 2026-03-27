@@ -67,8 +67,8 @@ class AddTaskParams(BaseModel):
         ),
     )
     user_timezone: str = Field(
-        default="UTC",
-        description="User's IANA timezone for parsing due dates (e.g., 'America/New_York', 'Europe/London')"
+        default="Asia/Karachi",
+        description="User's IANA timezone for parsing due dates (e.g., 'America/New_York', 'Asia/Karachi')"
     )
     recurrence_pattern: Optional[str] = Field(
         None,
