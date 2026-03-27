@@ -14,6 +14,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     build-essential \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install UV package manager

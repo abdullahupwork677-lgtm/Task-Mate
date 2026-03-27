@@ -249,7 +249,14 @@ def update_task(db: Session, params: UpdateTaskParams) -> UpdateTaskResult:
 
     # Phase V - US1: Handle due_date as natural language (T045)
     elif 'due_date' in fields_set:
-        if params.due_date and params.due_date.strip():
+        if params.due_date is None:
+            # Explicit null from chat/API means remove due date.
+            logger.info(f"Clearing due date for task {task.id} via due_date=None")
+            task.due_date = None
+            task.reminder_sent = {}
+            parsed_due_date = None
+            due_date_formatted = None
+        elif params.due_date and params.due_date.strip():
             try:
                 parsed_due_date = parse_natural_date(params.due_date, params.user_timezone)
                 due_date_formatted = format_due_date(parsed_due_date, params.user_timezone)

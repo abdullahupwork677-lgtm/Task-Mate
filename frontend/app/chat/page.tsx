@@ -84,6 +84,12 @@ export default function ChatPage() {
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [folder, setFolder] = useState<FolderState>({ open: true });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const localMessageSeqRef = useRef(0);
+
+  const makeLocalMessageId = (prefix: string): string => {
+    localMessageSeqRef.current += 1;
+    return `${prefix}-${Date.now()}-${localMessageSeqRef.current}`;
+  };
 
   useEffect(() => {
     const token = getToken();
@@ -199,8 +205,8 @@ export default function ChatPage() {
       } catch {}
       const messagesResponse = await apiFetch(`/api/conversations/${convId}/messages`) as any;
       if (messagesResponse.messages) {
-        const loadedMessages: Message[] = messagesResponse.messages.map((msg: any) => ({
-          id: msg.id?.toString() || Date.now().toString(),
+        const loadedMessages: Message[] = messagesResponse.messages.map((msg: any, idx: number) => ({
+          id: msg.id?.toString() || makeLocalMessageId(`loaded-${idx}`),
           role: (msg.sender || msg.role) === 'user' ? 'user' : 'assistant',
           content: msg.message || msg.content || '',
           timestamp: new Date(msg.created_at),
@@ -235,7 +241,7 @@ export default function ChatPage() {
     if (!inputMessage.trim() || !userId || isLoading) return;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: makeLocalMessageId('user'),
       role: 'user',
       content: inputMessage,
       timestamp: new Date(),
@@ -272,7 +278,7 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Failed to send message:', error);
       const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: makeLocalMessageId('error'),
         role: 'assistant',
         content: 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date(),

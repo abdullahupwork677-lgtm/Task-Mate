@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { generateTagColor } from '@/utils/tagColors';
+import { generateTagColor } from '@/src/utils/tagColors';
 
 interface TagBadgeProps {
   /**
@@ -57,9 +57,9 @@ export const TagBadge: React.FC<TagBadgeProps> = ({
 
   // Size-based styling
   const sizeClasses = {
-    sm: 'px-1.5 py-0.5 text-xs',
-    md: 'px-2 py-1 text-sm',
-    lg: 'px-3 py-1.5 text-base'
+    sm: 'px-2 py-0.5 text-[11px] leading-4',
+    md: 'px-2.5 py-1 text-xs leading-4',
+    lg: 'px-3 py-1.5 text-sm leading-5'
   };
 
   // Interactive styling if onClick provided
@@ -70,7 +70,8 @@ export const TagBadge: React.FC<TagBadgeProps> = ({
   return (
     <span
       className={`
-        inline-flex items-center rounded-full font-medium
+        inline-flex items-center rounded-full font-semibold
+        border border-white/25 shadow-sm ring-1 ring-black/10
         ${sizeClasses[size]}
         ${interactiveClasses}
         ${className}

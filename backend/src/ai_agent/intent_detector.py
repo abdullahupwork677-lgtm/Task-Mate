@@ -165,6 +165,23 @@ class IntentDetector:
         # Example: User says "mark the task complete", assistant asks "which task?", user says "buy apples"
         follow_up_intent = self._check_follow_up_response(message, message_lower, conversation_history)
         if follow_up_intent:
+            # If follow-up resolved to update but no fields were extracted, re-parse current
+            # message as update details against context task. This handles replies like
+            # "mark as incomplete" after "what would you like to update?".
+            if (
+                follow_up_intent.operation in {"update", "update_ask"}
+                and (not follow_up_intent.params)
+            ):
+                context_task_id = follow_up_intent.task_id or self._get_context_task_id(conversation_history)
+                if context_task_id:
+                    reparsed_intent = self._detect_update_intent(
+                        message,
+                        message_lower,
+                        conversation_history,
+                        implicit_task_id=context_task_id
+                    )
+                    if reparsed_intent:
+                        return reparsed_intent
             return follow_up_intent
 
         # STEP 1.75: If user explicitly provides a task title (common follow-up)
@@ -195,6 +212,10 @@ class IntentDetector:
             r'priority\s+(?:to|is|as)\s+',
             r'title\s+(?:to|is|as)\s+',
             r'description\s+(?:to|is|as)\s+',
+            r'\bmark\s+(?:it\s+)?as\s+incomplete\b',
+            r'\bmark\s+(?:it\s+)?as\s+complete(?:d)?\b',
+            r'\b(?:incomplete|pending|undone|not\s+done)\b',
+            r'\bremove\s+(?:the\s+)?(?:deadline|due\s+date)\b',
         ]
         has_implicit_update = any(re.search(p, message_lower) for p in implicit_update_patterns)
 
@@ -1081,6 +1102,8 @@ class IntentDetector:
             'deadline' in message_lower or 'due date' in message_lower or 'due_date' in message_lower,
             'description' in message_lower,
             ('title' in message_lower and ('to' in message_lower or ':' in message_lower)),
+            re.search(r'\b(mark\s+)?(?:it\s+)?(?:as\s+)?(?:incomplete|pending|undone|not\s+done)\b', message_lower) is not None,
+            re.search(r'\b(mark\s+)?(?:it\s+)?(?:as\s+)?complete(d)?\b|\bdone\b', message_lower) is not None,
             # Stronger patterns for title change without "title" keyword
             re.search(r'\\bchange\\b.*\\btitle\\b', message_lower) is not None,
             re.search(r'\\bset\\b.*\\bpriority\\b', message_lower) is not None,
@@ -1206,9 +1229,19 @@ class IntentDetector:
         
         # Extract completed status (mark as complete/incomplete)
         if 'completed' not in params:
-            if re.search(r'\b(mark\s+)?(?:it\s+)?(?:as\s+)?(?:incomplete|pending|undone|not\s+done)\b', message_lower) and 'complete' not in message_lower:
+            has_incomplete_signal = re.search(
+                r'\b(mark\s+)?(?:it\s+)?(?:as\s+)?(?:incomplete|pending|undone|not\s+done)\b',
+                message_lower
+            ) is not None
+            has_complete_signal = re.search(
+                r'\b(mark\s+)?(?:it\s+)?(?:as\s+)?complete(d)?\b|\bdone\b',
+                message_lower
+            ) is not None
+
+            # "incomplete" contains the substring "complete", so use regex signals instead of substring checks.
+            if has_incomplete_signal and not has_complete_signal:
                 params['completed'] = False
-            elif re.search(r'\b(mark\s+)?(?:it\s+)?(?:as\s+)?complete(d)?\b|\bdone\b', message_lower) and 'incomplete' not in message_lower:
+            elif has_complete_signal and not has_incomplete_signal:
                 params['completed'] = True
 
         logger.info(

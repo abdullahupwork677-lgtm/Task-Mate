@@ -212,6 +212,11 @@ async def run_agent(
             messages = [{"role": "system", "content": get_system_prompt()}]
             messages.extend(conversation_history)
             messages.append({"role": "user", "content": message})
+            # Conversation history stores app-level tool metadata, not OpenAI tool_calls format.
+            # Strip it before sending to Chat Completions to avoid 400 errors.
+            for msg in messages:
+                if isinstance(msg, dict):
+                    msg.pop("tool_calls", None)
 
         # Call OpenAI API with tools
         with track_performance("agent_execution", user_id):
@@ -418,7 +423,7 @@ async def run_agent(
                 "error": error_msg,
                 "error_type": "api_error",
                 "status_code": status_code,
-                "message": message[:100] if message else None
+                "user_message_preview": message[:100] if message else None
             },
             exc_info=True
         )

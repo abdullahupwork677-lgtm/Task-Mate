@@ -7,8 +7,10 @@ function getApiBaseUrl(): string {
   const envUrl = (g?.NEXT_PUBLIC_API_URL ?? '').trim();
   if (envUrl) return envUrl;
   if (typeof window !== 'undefined') {
-    // Direct port-forward: frontend on 3000, backend on 8000 — no Host/ingress issue
-    if (window.location.hostname === 'localhost' && window.location.port === '3000') return 'http://localhost:8000';
+    // Local dev: regardless of frontend port (3000/3001/etc), backend runs on 8000
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return `http://${window.location.hostname}:8000`;
+    }
     return window.location.origin;
   }
   return '/api/proxy';

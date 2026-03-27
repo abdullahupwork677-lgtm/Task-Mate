@@ -87,7 +87,7 @@ def add_tag(db: Session, params: AddTagParams) -> AddTagResult:
     """
     # Initialize services
     tag_service = TagService()
-    task_service = TaskService(db, tag_service)
+    task_service = TaskService(db)
 
     # Validate and normalize tags
     normalized_tags = tag_service.validate_and_normalize_tags(params.tags)
@@ -123,7 +123,6 @@ def add_tag(db: Session, params: AddTagParams) -> AddTagResult:
     )
 
     # Determine which tags were added vs already present
-    new_tags_set = set(updated_task.tags)
     tags_added = [tag for tag in normalized_tags if tag not in existing_tags]
     tags_already_present = [tag for tag in normalized_tags if tag in existing_tags]
 

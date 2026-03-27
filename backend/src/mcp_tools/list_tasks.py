@@ -12,7 +12,7 @@ Phase V Extension (US1):
 """
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field, validator
 from sqlmodel import Session, select, col
@@ -31,7 +31,10 @@ def calculate_overdue_by(due_date: datetime) -> str:
         Human-readable duration like "2 days", "3 hours", "45 minutes"
     """
     now = datetime.now(ZoneInfo("UTC"))
-    delta = now - due_date
+    normalized_due_date = due_date
+    if normalized_due_date.tzinfo is None:
+        normalized_due_date = normalized_due_date.replace(tzinfo=timezone.utc)
+    delta = now - normalized_due_date
 
     # Calculate total seconds
     total_seconds = int(delta.total_seconds())
@@ -369,11 +372,16 @@ def list_tasks(db: Session, params: ListTasksParams) -> ListTasksResult:
             # Format due date in user's timezone (T048)
             due_date_formatted = format_due_date(task.due_date, params.user_timezone)
 
+            # Normalize mixed timezone datetime values from SQLite/Postgres before comparison.
+            due_date_for_compare = task.due_date
+            if due_date_for_compare.tzinfo is None:
+                due_date_for_compare = due_date_for_compare.replace(tzinfo=timezone.utc)
+
             # Calculate is_overdue: due_date < now AND not completed (T049)
-            if task.due_date < now and not task.completed:
+            if due_date_for_compare < now and not task.completed:
                 is_overdue = True
                 # Calculate overdue_by human-readable duration (T050)
-                overdue_by = calculate_overdue_by(task.due_date)
+                overdue_by = calculate_overdue_by(due_date_for_compare)
 
         task_dict = {
             "task_id": task.id,

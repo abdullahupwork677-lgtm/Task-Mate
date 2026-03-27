@@ -23,6 +23,8 @@ from ..mcp_tools.complete_task import complete_task, CompleteTaskParams
 from ..mcp_tools.update_task import update_task, UpdateTaskParams
 from ..mcp_tools.delete_task import delete_task, DeleteTaskParams
 from ..mcp_tools.find_task import find_task, FindTaskParams
+from ..mcp_tools.add_tag import add_tag, AddTagParams
+from ..mcp_tools.remove_tag import remove_tag, RemoveTagParams
 from ..mcp_tools.set_reminder import set_reminder, SetReminderParams
 from ..utils.performance import log_execution_time, track_performance
 import logging
@@ -581,8 +583,195 @@ async def chat(
         # If intent detected with params, FORCE tool execution
         # This bypasses unreliable AI system prompt interpretation
 
-        detected_intent = detect_user_intent(request.message, conversation_history)
-        forced_tool_calls = []
+        pre_forced_tool_calls = []
+        if current_state and current_state.get('current_intent') == 'PENDING_CONFIRMATION':
+            pending = current_state.get('state_data') or {}
+            pending_operation = pending.get('operation')
+            pending_params = pending.get('params') or {}
+            short_msg = request.message.lower().strip()
+            is_yes = any(k in short_msg for k in ['yes', 'haan', 'han', 'yep', 'ok']) and len(short_msg.split()) <= 3
+            is_no = any(k in short_msg for k in ['no', 'nahi', 'cancel', 'na', 'nope']) and len(short_msg.split()) <= 3
+
+            if is_no:
+                conversation_service.reset_conversation_state(conversation_id, user_id)
+                cancellation_msg = "❌ Operation cancelled. No changes were made."
+                conversation_service.add_message(conversation_id, user_id, "user", request.message)
+                conversation_service.add_message(conversation_id, user_id, "assistant", cancellation_msg)
+                conversation_service.update_conversation_timestamp(conversation_id)
+                return ChatResponse(conversation_id=conversation_id, response=cancellation_msg, tool_calls=[])
+
+            if is_yes and pending_operation:
+                op_to_tool = {
+                    "delete": "delete_task",
+                    "complete": "complete_task",
+                    "incomplete": "update_task",
+                    "update": "update_task",
+                    "update_ask": "update_task",
+                    "add_tag": "add_tag",
+                    "remove_tag": "remove_tag",
+                }
+                mapped_tool = op_to_tool.get(pending_operation)
+                if mapped_tool:
+                    params_for_exec = dict(pending_params)
+                    # Resolve task by title at execution time if needed.
+                    if 'task_id' not in params_for_exec and params_for_exec.get('task_title'):
+                        try:
+                            find_params = FindTaskParams(
+                                user_id=user_id,
+                                title=params_for_exec.get('task_title')
+                            )
+                            find_result = find_task(db, find_params)
+                            if find_result:
+                                params_for_exec['task_id'] = find_result.task_id
+                        except Exception:
+                            pass
+                    pre_forced_tool_calls.append({
+                        "tool": mapped_tool,
+                        "params": params_for_exec
+                    })
+                    conversation_service.reset_conversation_state(conversation_id, user_id)
+        message_lower = request.message.lower().strip()
+
+        # Deterministic tag commands: avoid intent confusion with delete/remove task flows.
+        add_tag_match = re.search(
+            r"(?:add\s+tag|tag)\s+(.+?)\s+(?:to|on)\s+task(?:\s+id)?\s*#?\s*(\d+)",
+            message_lower
+        )
+        remove_tag_match = re.search(
+            r"(?:remove\s+tag|untag)\s+(.+?)\s+(?:from|on)\s+task(?:\s+id)?\s*#?\s*(\d+)",
+            message_lower
+        )
+        remove_tag_title_match = re.search(
+            r"(?:remove\s+tag|untag)\s+(.+?)\s+(?:from|on)\s+(?:the\s+)?task\s+(.+)$",
+            message_lower
+        )
+        remove_tag_alt_match = re.search(
+            r"task(?:\s+id)?\s*#?\s*(\d+).{0,30}\btag\b\s+([a-z0-9_-]+).{0,30}\bremove\b",
+            message_lower
+        )
+
+        def _extract_tags(tags_raw: str) -> List[str]:
+            parts = re.split(r",|\band\b", tags_raw)
+            return [p.strip() for p in parts if p.strip()]
+
+        if add_tag_match:
+            pre_forced_tool_calls.append({
+                "tool": "add_tag",
+                "params": {
+                    "task_id": int(add_tag_match.group(2)),
+                    "tags": _extract_tags(add_tag_match.group(1))
+                }
+            })
+            logger.info(
+                f"Forced tag operation detected: add_tag task_id={add_tag_match.group(2)}",
+                extra={"user_id": user_id}
+            )
+        elif remove_tag_match:
+            pre_forced_tool_calls.append({
+                "tool": "remove_tag",
+                "params": {
+                    "task_id": int(remove_tag_match.group(2)),
+                    "tags": _extract_tags(remove_tag_match.group(1))
+                }
+            })
+            logger.info(
+                f"Forced tag operation detected: remove_tag task_id={remove_tag_match.group(2)}",
+                extra={"user_id": user_id}
+            )
+        elif remove_tag_alt_match:
+            pre_forced_tool_calls.append({
+                "tool": "remove_tag",
+                "params": {
+                    "task_id": int(remove_tag_alt_match.group(1)),
+                    "tags": [remove_tag_alt_match.group(2)]
+                }
+            })
+            logger.info(
+                f"Forced tag operation detected (alt pattern): remove_tag task_id={remove_tag_alt_match.group(1)}",
+                extra={"user_id": user_id}
+            )
+        elif remove_tag_title_match:
+            tags = _extract_tags(remove_tag_title_match.group(1))
+            task_title = remove_tag_title_match.group(2).strip()
+            try:
+                find_params = FindTaskParams(user_id=user_id, title=task_title)
+                find_result = find_task(db, find_params)
+                if find_result:
+                    pre_forced_tool_calls.append({
+                        "tool": "remove_tag",
+                        "params": {
+                            "task_id": find_result.task_id,
+                            "tags": tags
+                        }
+                    })
+                    logger.info(
+                        f"Forced tag operation by title: remove_tag task_id={find_result.task_id}",
+                        extra={"user_id": user_id}
+                    )
+            except Exception:
+                pass
+
+        # Deterministic list commands to avoid misclassification as COMPLETE/DELETE intents.
+        list_command = re.search(
+            r"^(?:show|list|display|view)\b.*\btasks?\b",
+            message_lower
+        )
+        if list_command and not pre_forced_tool_calls:
+            list_params: Dict[str, Any] = {"status": "all"}
+            if "completed" in message_lower or "done" in message_lower:
+                list_params["status"] = "completed"
+            elif "pending" in message_lower or "incomplete" in message_lower or "active" in message_lower:
+                list_params["status"] = "pending"
+
+            if "high priority" in message_lower:
+                list_params["priority"] = "high"
+            elif "medium priority" in message_lower:
+                list_params["priority"] = "medium"
+            elif "low priority" in message_lower:
+                list_params["priority"] = "low"
+
+            if "sort by due date" in message_lower:
+                list_params["sort_by"] = "due_date"
+            elif "sort by priority" in message_lower:
+                list_params["sort_by"] = "priority"
+            elif "sort by title" in message_lower or "alphabetical" in message_lower:
+                list_params["sort_by"] = "title"
+            elif "sort by created" in message_lower or "newest" in message_lower or "oldest" in message_lower:
+                list_params["sort_by"] = "created_at"
+
+            if (
+                "descending" in message_lower
+                or "desc" in message_lower
+                or "latest first" in message_lower
+                or "newest first" in message_lower
+            ):
+                list_params["sort_direction"] = "desc"
+            elif (
+                "ascending" in message_lower
+                or "asc" in message_lower
+                or "ascending order" in message_lower
+                or "oldest first" in message_lower
+                or "small to large" in message_lower
+            ):
+                list_params["sort_direction"] = "asc"
+
+            tag_match = re.search(r"(?:show|list)\s+([a-z0-9_-]+)\s+tasks", message_lower)
+            if tag_match:
+                candidate = tag_match.group(1)
+                if candidate not in {"all", "pending", "completed", "complete", "high", "medium", "low"}:
+                    list_params["tag_filter"] = [candidate]
+
+            pre_forced_tool_calls.append({
+                "tool": "list_tasks",
+                "params": list_params
+            })
+            logger.info(
+                f"Forced deterministic list command with params={list_params}",
+                extra={"user_id": user_id, "list_params": list_params}
+            )
+
+        detected_intent = None if pre_forced_tool_calls else detect_user_intent(request.message, conversation_history)
+        forced_tool_calls = list(pre_forced_tool_calls)
 
         # Handle explicit cancellation (user said "no" to confirmation)
         if detected_intent is None:
@@ -829,6 +1018,29 @@ async def chat(
                 else:
                     confirmation_msg = "Kya aap sure hain? (Are you sure?)\n\nReply 'yes' to confirm or 'no' to cancel."
 
+                pending_params: Dict[str, Any] = {}
+                if detected_intent.task_id:
+                    pending_params["task_id"] = detected_intent.task_id
+                if detected_intent.task_title:
+                    pending_params["task_title"] = detected_intent.task_title
+                if detected_intent.params:
+                    # Keep original params; tool-specific executor will read relevant fields.
+                    pending_params.update(detected_intent.params)
+                if detected_intent.operation == "incomplete":
+                    pending_params["completed"] = False
+                pending_operation = "update" if detected_intent.operation == "update_ask" else detected_intent.operation
+
+                conversation_service.update_conversation_state(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    current_intent="PENDING_CONFIRMATION",
+                    state_data={
+                        "operation": pending_operation,
+                        "params": pending_params
+                    },
+                    target_task_id=detected_intent.task_id
+                )
+
                 # Store messages in database
                 conversation_service.add_message(
                     conversation_id=conversation_id,
@@ -1065,8 +1277,8 @@ async def chat(
                                 else:
                                     confirmation_lines.append(f"  • Due Date: → (removed)")
                             if 'completed' in update_params:
-                                status = "Complete ✅" if update_params['completed'] else "Incomplete ⏳"
-                                confirmation_lines.append(f"  • Status: → {status}")
+                                task_status_label = "Complete ✅" if update_params['completed'] else "Incomplete ⏳"
+                                confirmation_lines.append(f"  • Status: → {task_status_label}")
                             
                             confirmation_lines.append("\n**Kya aap sure hain? (Are you sure?)**")
                             confirmation_lines.append("Reply 'yes' to confirm or 'no' to cancel.")
@@ -1074,6 +1286,16 @@ async def chat(
                             confirmation_msg = "\n".join(confirmation_lines)
                             
                             # Store user message and confirmation
+                            conversation_service.update_conversation_state(
+                                conversation_id=conversation_id,
+                                user_id=user_id,
+                                current_intent="PENDING_CONFIRMATION",
+                                state_data={
+                                    "operation": "update_task",
+                                    "params": update_params
+                                },
+                                target_task_id=task_id
+                            )
                             conversation_service.add_message(
                                 conversation_id=conversation_id,
                                 user_id=user_id,
@@ -1294,17 +1516,52 @@ async def chat(
 
             # Handle LIST intent (show tasks)
             elif detected_intent.operation == "list":
+                list_params = dict(detected_intent.params or {})
+                status_value = list_params.get("status", "all")
+                # Intent detector sometimes emits "active"; list_tasks expects "pending".
+                if status_value == "active":
+                    status_value = "pending"
+                list_params["status"] = status_value
+
+                # Lightweight deterministic enrichment for chat filter/sort commands.
+                msg = message_lower
+                if "high priority" in msg:
+                    list_params["priority"] = "high"
+                elif "medium priority" in msg:
+                    list_params["priority"] = "medium"
+                elif "low priority" in msg:
+                    list_params["priority"] = "low"
+
+                if "sort by due date" in msg:
+                    list_params["sort_by"] = "due_date"
+                elif "sort by priority" in msg:
+                    list_params["sort_by"] = "priority"
+                elif "sort by title" in msg or "alphabetical" in msg:
+                    list_params["sort_by"] = "title"
+                elif "sort by created" in msg or "newest" in msg or "oldest" in msg:
+                    list_params["sort_by"] = "created_at"
+
+                if "descending" in msg or "desc" in msg or "latest first" in msg or "newest first" in msg:
+                    list_params["sort_direction"] = "desc"
+                elif "ascending" in msg or "asc" in msg or "ascending order" in msg or "oldest first" in msg:
+                    list_params["sort_direction"] = "asc"
+
+                # "show work tasks" / "show urgent tasks" => tag filter
+                tag_match = re.search(r"(?:show|list)\s+([a-z0-9_-]+)\s+tasks", msg)
+                if tag_match:
+                    candidate = tag_match.group(1)
+                    if candidate not in {"all", "pending", "completed", "complete", "high", "medium", "low"}:
+                        list_params["tag_filter"] = [candidate]
+
                 # FORCE list_tasks execution (user_id from auth in execution loop)
                 forced_tool_calls.append({
                     'tool': 'list_tasks',
-                    'params': {
-                        'status': detected_intent.params.get('status', 'all')
-                    }
+                    'params': list_params
                 })
 
                 logger.info(
-                    f"FORCED LIST: status={detected_intent.params.get('status', 'all')}",
-                    extra={"user_id": user_id, "status": detected_intent.params.get('status', 'all')}
+                    f"FORCED LIST with params={list_params}",
+                    extra={"user_id": user_id, "list_params": list_params}
                 )
 
             # Handle ADD intent (create task) - Initialize multi-turn workflow
@@ -1611,7 +1868,7 @@ async def chat(
         skip_ai_agent = False
         if forced_tool_calls:
             # Check if all forced tool calls are confirmed operations (add, update, delete, complete, incomplete, list)
-            confirmed_operations = ['add_task', 'update_task', 'delete_task', 'complete_task', 'list_tasks']
+            confirmed_operations = ['add_task', 'update_task', 'delete_task', 'complete_task', 'list_tasks', 'add_tag', 'remove_tag']
             skip_ai_agent = all(
                 tool_call.get('tool') in confirmed_operations 
                 for tool_call in forced_tool_calls
@@ -1744,9 +2001,17 @@ async def chat(
                 elif tool_name == 'list_tasks':
                     # Execute list_tasks tool
                     try:
+                        status_value = tool_params.get('status', 'all')
+                        if status_value == 'active':
+                            status_value = 'pending'
                         params = ListTasksParams(
                             user_id=user_id,
-                            status=tool_params.get('status', 'all')
+                            status=status_value,
+                            priority=tool_params.get('priority', 'all'),
+                            recurring=tool_params.get('recurring', 'all'),
+                            tag_filter=tool_params.get('tag_filter'),
+                            sort_by=tool_params.get('sort_by', 'created_at'),
+                            sort_direction=tool_params.get('sort_direction')
                         )
                         result = list_tasks(db, params)
                         executed_tools.append({
@@ -1811,6 +2076,68 @@ async def chat(
                         })
                         # Continue even if tool fails
 
+                elif tool_name == 'add_tag':
+                    # Execute add_tag tool
+                    try:
+                        params = AddTagParams(
+                            user_id=user_id,
+                            task_id=tool_params.get('task_id'),
+                            tags=tool_params.get('tags', [])
+                        )
+                        result = add_tag(db, params)
+                        executed_tools.append({
+                            'tool': 'add_tag',
+                            'params': tool_params,
+                            'result': {
+                                'task_id': result.task_id,
+                                'title': result.title,
+                                'tags': result.tags,
+                                'tags_added': result.tags_added,
+                                'tags_already_present': result.tags_already_present,
+                                'message': result.message
+                            }
+                        })
+                    except Exception as e:
+                        logger.error(f"Tool execution failed: {e}", exc_info=True)
+                        tool_errors.append({"tool": "add_tag", "error": str(e)})
+                        executed_tools.append({
+                            'tool': 'add_tag',
+                            'params': tool_params,
+                            'result': {'error': str(e)}
+                        })
+                        # Continue even if tool fails
+
+                elif tool_name == 'remove_tag':
+                    # Execute remove_tag tool
+                    try:
+                        params = RemoveTagParams(
+                            user_id=user_id,
+                            task_id=tool_params.get('task_id'),
+                            tags=tool_params.get('tags', [])
+                        )
+                        result = remove_tag(db, params)
+                        executed_tools.append({
+                            'tool': 'remove_tag',
+                            'params': tool_params,
+                            'result': {
+                                'task_id': result.task_id,
+                                'title': result.title,
+                                'tags': result.tags,
+                                'tags_removed': result.tags_removed,
+                                'tags_not_found': result.tags_not_found,
+                                'message': result.message
+                            }
+                        })
+                    except Exception as e:
+                        logger.error(f"Tool execution failed: {e}", exc_info=True)
+                        tool_errors.append({"tool": "remove_tag", "error": str(e)})
+                        executed_tools.append({
+                            'tool': 'remove_tag',
+                            'params': tool_params,
+                            'result': {'error': str(e)}
+                        })
+                        # Continue even if tool fails
+
                 elif tool_name == 'update_task':
                     # Execute update_task tool
                     try:
@@ -1845,23 +2172,11 @@ async def chat(
                             due_date_str = tool_params.get("due_date")
                             if due_date_str is None:
                                 update_kwargs["due_date"] = None
-                                logger.info(f"update_task: Removing due_date (set to None)")
+                                logger.info("update_task: Removing due_date (set to None)")
                             elif isinstance(due_date_str, str) and due_date_str.strip():
-                                # Try parse_natural_date first (handles natural language + ISO)
-                                parsed_date = parse_natural_date(due_date_str)
-                                if parsed_date:
-                                    update_kwargs["due_date"] = parsed_date
-                                    logger.info(f"update_task: Parsed due_date '{due_date_str}' → {parsed_date}")
-                                else:
-                                    # Fallback: Try ISO format with Z suffix handling
-                                    try:
-                                        # Handle "Z" suffix (UTC timezone indicator)
-                                        clean_date_str = due_date_str.replace('Z', '+00:00')
-                                        update_kwargs["due_date"] = datetime.fromisoformat(clean_date_str)
-                                        logger.info(f"update_task: Parsed ISO due_date '{due_date_str}'")
-                                    except (ValueError, TypeError) as e:
-                                        logger.error(f"update_task: Failed to parse due_date '{due_date_str}': {e}")
-                                        raise ValueError(f"Invalid due_date format: {due_date_str}. Use ISO 8601 format (e.g., '2026-01-15T14:30:00') or natural language (e.g., 'tomorrow at 3pm').")
+                                # Keep natural-language/ISO date as string; mcp_tools.update_task handles parsing.
+                                update_kwargs["due_date"] = due_date_str.strip()
+                                logger.info(f"update_task: Passing due_date string '{due_date_str}' to tool parser")
 
                         params = UpdateTaskParams(**update_kwargs)
                         result = update_task(db, params)
@@ -2238,8 +2553,8 @@ async def chat(
                         else:
                             updates.append("removed due date")
                     if 'completed' in tool_call.get('params', {}):
-                        status = "complete" if tool_result.get('completed') else "incomplete"
-                        updates.append(f"marked as {status}")
+                        completion_status = "complete" if tool_result.get('completed') else "incomplete"
+                        updates.append(f"marked as {completion_status}")
                     if 'title' in tool_call.get('params', {}):
                         updates.append(f"title to '{tool_result.get('title')}'")
                     
@@ -2255,6 +2570,36 @@ async def chat(
                     task_id = tool_result.get('task_id')
                     title = tool_result.get('title', 'task')
                     response_lines.append(f"✅ I've marked task #{task_id} ({title}) as complete.")
+                elif tool_name == 'add_tag' and 'error' not in tool_result:
+                    task_id = tool_result.get('task_id')
+                    title = tool_result.get('title', 'task')
+                    tags_added = tool_result.get('tags_added') or []
+                    tags_present = tool_result.get('tags_already_present') or []
+                    if tags_added:
+                        response_lines.append(
+                            f"✅ I've added tag(s) {', '.join(tags_added)} to task #{task_id} ({title})."
+                        )
+                    elif tags_present:
+                        response_lines.append(
+                            f"ℹ️ Task #{task_id} ({title}) already has tag(s): {', '.join(tags_present)}."
+                        )
+                    else:
+                        response_lines.append(f"✅ Tags updated for task #{task_id} ({title}).")
+                elif tool_name == 'remove_tag' and 'error' not in tool_result:
+                    task_id = tool_result.get('task_id')
+                    title = tool_result.get('title', 'task')
+                    tags_removed = tool_result.get('tags_removed') or []
+                    tags_not_found = tool_result.get('tags_not_found') or []
+                    if tags_removed:
+                        response_lines.append(
+                            f"✅ I've removed tag(s) {', '.join(tags_removed)} from task #{task_id} ({title})."
+                        )
+                    elif tags_not_found:
+                        response_lines.append(
+                            f"ℹ️ Task #{task_id} ({title}) doesn't have tag(s): {', '.join(tags_not_found)}."
+                        )
+                    else:
+                        response_lines.append(f"✅ Tags updated for task #{task_id} ({title}).")
             
             if response_lines:
                 final_response = "\n".join(response_lines)

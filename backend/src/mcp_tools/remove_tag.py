@@ -86,7 +86,7 @@ def remove_tag(db: Session, params: RemoveTagParams) -> RemoveTagResult:
     """
     # Initialize services
     tag_service = TagService()
-    task_service = TaskService(db, tag_service)
+    task_service = TaskService(db)
 
     # Normalize tags for case-insensitive matching
     normalized_tags = tag_service.normalize_tags(params.tags)
@@ -116,7 +116,6 @@ def remove_tag(db: Session, params: RemoveTagParams) -> RemoveTagResult:
     )
 
     # Determine which tags were removed vs not found
-    new_tags_set = set(updated_task.tags)
     tags_removed = [tag for tag in normalized_tags if tag in existing_tags]
     tags_not_found = [tag for tag in normalized_tags if tag not in existing_tags]
 
