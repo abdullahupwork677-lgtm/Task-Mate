@@ -12,6 +12,7 @@ import gzip
 import json
 import logging
 import os
+import ssl
 import uuid
 from typing import List
 from datetime import datetime
@@ -27,6 +28,10 @@ logger = logging.getLogger(__name__)
 # Kafka configuration from environment
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC_REMINDERS = os.getenv("KAFKA_TOPIC_REMINDERS", "reminders")
+KAFKA_SECURITY_PROTOCOL = os.getenv("KAFKA_SECURITY_PROTOCOL", "PLAINTEXT")
+KAFKA_SASL_MECHANISM = os.getenv("KAFKA_SASL_MECHANISM", "PLAIN")
+KAFKA_SASL_USERNAME = os.getenv("KAFKA_SASL_USERNAME", "")
+KAFKA_SASL_PASSWORD = os.getenv("KAFKA_SASL_PASSWORD", "")
 
 # Retry configuration (T076)
 MAX_RETRIES = 3
@@ -84,15 +89,29 @@ class KafkaProducerService:
             Exception: If connection to Kafka fails (T076)
         """
         try:
-            self.producer = AIOKafkaProducer(
-                bootstrap_servers=self.bootstrap_servers,
-                # Compression enabled for bandwidth efficiency (T074)
-                compression_type='gzip',
-                # Acknowledgment settings for reliability
-                acks='all',
-                # Note: 'retries' parameter removed in newer aiokafka versions
-                # Retries are now handled at the application level
+            # Build kwargs based on security protocol
+            producer_kwargs: dict = {
+                "bootstrap_servers": self.bootstrap_servers,
+                "compression_type": "gzip",
+                "acks": "all",
+            }
+
+            if KAFKA_SECURITY_PROTOCOL in ("SASL_SSL", "SSL"):
+                ssl_context = ssl.create_default_context()
+                producer_kwargs["ssl_context"] = ssl_context
+
+            if KAFKA_SECURITY_PROTOCOL in ("SASL_SSL", "SASL_PLAINTEXT"):
+                producer_kwargs["security_protocol"] = KAFKA_SECURITY_PROTOCOL
+                producer_kwargs["sasl_mechanism"] = KAFKA_SASL_MECHANISM
+                producer_kwargs["sasl_plain_username"] = KAFKA_SASL_USERNAME
+                producer_kwargs["sasl_plain_password"] = KAFKA_SASL_PASSWORD
+
+            logger.info(
+                f"Connecting to Kafka: servers={self.bootstrap_servers}, "
+                f"protocol={KAFKA_SECURITY_PROTOCOL}, mechanism={KAFKA_SASL_MECHANISM}"
             )
+
+            self.producer = AIOKafkaProducer(**producer_kwargs)
             await self.producer.start()
             logger.info("Kafka producer started successfully")
         except Exception as e:

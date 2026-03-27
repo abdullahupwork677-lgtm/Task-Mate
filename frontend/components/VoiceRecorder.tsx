@@ -34,6 +34,17 @@ export function VoiceRecorder({ onTranscription, disabled }: VoiceRecorderProps)
     try {
       setError(null);
 
+      // Check for secure context (HTTPS or localhost) — getUserMedia requires it
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!isLocalhost && window.location.protocol !== 'https:') {
+          setError('Microphone requires HTTPS. Please use https://todo.139.59.195.161.nip.io');
+        } else {
+          setError('Microphone not supported in this browser.');
+        }
+        return;
+      }
+
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
