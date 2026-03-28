@@ -359,6 +359,10 @@ class NotificationLog(SQLModel, table=True):
         sa_column=Column(PGUUID(as_uuid=True), unique=True, nullable=False),
         description="Kafka event UUID for idempotency"
     )
+    title: Optional[str] = Field(default=None, max_length=500)
+    message: Optional[str] = Field(default=None)
+    is_read: bool = Field(default=False)
+    created_at: Optional[datetime] = Field(default=None)
 
     # Relationships
     task: Optional[Task] = Relationship(back_populates="notification_logs")

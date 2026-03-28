@@ -17,10 +17,6 @@ from src.models import Task
 
 logger = logging.getLogger(__name__)
 
-# Grace period for sending reminders (allows for cron schedule drift)
-GRACE_PERIOD_MINUTES = 60  # 1 hour grace period
-
-
 def parse_interval_to_timedelta(interval: str) -> timedelta:
     """Parse interval string to timedelta.
 
@@ -148,28 +144,32 @@ def should_send_reminder(
     # Calculate reminder time
     reminder_time = calculate_reminder_time(task.due_date, interval)
 
-    # Check if current time is within reminder window
-    # We use a grace period to account for cron schedule drift
-    grace_period = timedelta(minutes=GRACE_PERIOD_MINUTES)
+    # Ensure current_time is comparable (UTC-aware)
+    ct = current_time
+    if ct.tzinfo is None:
+        ct = ct.replace(tzinfo=ZoneInfo("UTC"))
 
-    # Reminder window: [reminder_time, reminder_time + grace_period]
-    is_within_window = (
-        reminder_time <= current_time <= (reminder_time + grace_period)
-    )
+    # Send once any time after reminder_time until the task is due (task list already
+    # filters due_date > now). A tight [reminder_time, reminder_time + grace] window
+    # often missed 5-minute cron ticks for short offsets (e.g. "5m before").
+    due = task.due_date
+    if due.tzinfo is None:
+        due = due.replace(tzinfo=ZoneInfo("UTC"))
 
-    if is_within_window:
+    is_due = reminder_time <= ct < due
+
+    if is_due:
         logger.info(
             f"Task {task.id}: Reminder due (interval={interval}, "
-            f"reminder_time={reminder_time}, current_time={current_time})"
+            f"reminder_time={reminder_time}, current_time={ct}, due={due})"
         )
     else:
         logger.debug(
-            f"Task {task.id}: Not within reminder window "
-            f"(reminder_time={reminder_time}, current_time={current_time}, "
-            f"grace_period={grace_period})"
+            f"Task {task.id}: Not in reminder window "
+            f"(reminder_time={reminder_time}, current_time={ct}, due={due})"
         )
 
-    return is_within_window
+    return is_due
 
 
 def get_tasks_needing_reminders(

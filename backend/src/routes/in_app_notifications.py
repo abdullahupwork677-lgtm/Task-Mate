@@ -68,8 +68,8 @@ def get_in_app_notifications(
     Raises:
         HTTPException 403: If user_id doesn't match authenticated user
     """
-    # User isolation: current_user is the user_id string returned by get_current_user
-    if current_user != user_id:
+    # User isolation: normalize (JWT sub and path param must match)
+    if str(current_user).strip() != str(user_id).strip():
         logger.warning(
             f"User {current_user} attempted to access notifications for user {user_id}"
         )
@@ -171,8 +171,8 @@ def mark_notification_as_read(
         HTTPException 403: If user_id doesn't match authenticated user
         HTTPException 404: If notification not found or doesn't belong to user
     """
-    # User isolation: current_user is the user_id string returned by get_current_user
-    if current_user != user_id:
+    # User isolation: normalize (JWT sub and path param must match)
+    if str(current_user).strip() != str(user_id).strip():
         logger.warning(
             f"User {current_user} attempted to update notification for user {user_id}"
         )

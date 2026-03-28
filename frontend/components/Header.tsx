@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
 import { getToken } from '@/lib/auth';
+import { getApiBaseUrl } from '@/lib/api';
 
 interface Notification {
   id: number;
@@ -31,9 +32,12 @@ export function Header() {
       const token = getToken();
       const userId = user?.id;
       if (!token || !userId) return;
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const apiUrl = getApiBaseUrl().replace(/\/$/, '');
       const res = await fetch(`${apiUrl}/api/users/${userId}/notifications?limit=20`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -47,10 +51,14 @@ export function Header() {
       const token = getToken();
       const userId = user?.id;
       if (!token || !userId) return;
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const apiUrl = getApiBaseUrl().replace(/\/$/, '');
       await fetch(`${apiUrl}/api/users/${userId}/notifications/${id}/read`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
       });
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     } catch (_) {}

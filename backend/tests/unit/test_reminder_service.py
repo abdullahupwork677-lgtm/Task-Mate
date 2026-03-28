@@ -111,11 +111,11 @@ def test_should_send_reminder_when_time_before_window(sample_task):
 
 
 @freeze_time("2026-02-10 18:00:00", tz_offset=0)
-def test_should_send_reminder_within_grace_period(sample_task):
-    """Test that reminder should be sent within grace period (5 minutes)."""
+def test_should_send_reminder_after_reminder_time_until_due(sample_task):
+    """Test that reminder sends any time from reminder_time until due (cron-friendly)."""
     current_time = datetime(2026, 2, 10, 18, 0, 0, tzinfo=ZoneInfo("UTC"))
 
-    # Current time is 23h before due date (within 1-hour grace period)
+    # 23h before due: past 24h reminder point, still before due date
     result = should_send_reminder(sample_task, "24h", current_time)
 
     assert result is True
@@ -141,6 +141,23 @@ def test_should_send_reminder_skip_if_completed(sample_task):
     result = should_send_reminder(sample_task, "24h", current_time)
 
     assert result is False
+
+
+def test_should_send_reminder_short_interval_5m_before_due():
+    """Short 'remind 5m before' must fire for whole window until due (not one cron tick)."""
+    task = Mock()
+    task.id = 1
+    task.completed = False
+    task.reminder_sent = {}
+    # Due in 10 minutes from T0; 5m before => reminder at T0+5m
+    t0 = datetime(2026, 3, 28, 12, 0, 0, tzinfo=ZoneInfo("UTC"))
+    task.due_date = t0 + timedelta(minutes=10)
+    # Too early (T0+2m)
+    assert should_send_reminder(task, "5m", t0 + timedelta(minutes=2)) is False
+    # In window (T0+6m)
+    assert should_send_reminder(task, "5m", t0 + timedelta(minutes=6)) is True
+    # Still in window one minute before due (T0+9m)
+    assert should_send_reminder(task, "5m", t0 + timedelta(minutes=9)) is True
 
 
 # ========== TEST CASE 3: Parse interval to timedelta ==========

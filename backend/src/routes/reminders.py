@@ -156,16 +156,17 @@ async def reminder_check_endpoint(
                             # T152: Determine notification channels from user preferences
                             channels = _get_enabled_channels(task.user_id, db)
 
-                            # Generate event_id for idempotency
-                            event_id = str(uuid.uuid4())
+                            # Generate event_id for idempotency (DB column is UUID)
+                            event_id = uuid.uuid4()
 
-                            # Save in-app notification directly to DB (no Kafka consumer needed)
+                            notif_title = f"⏰ Reminder: {task.title}"
+                            notif_msg = (
+                                f"Task '{task.title}' is due in {interval}. "
+                                f"Due: {task.due_date.strftime('%b %d, %Y %H:%M') if task.due_date else 'soon'}."
+                            )
+
+                            # Save in-app row before marking reminder_sent; do not mark sent if DB insert fails
                             if "in_app" in channels:
-                                notif_title = f"⏰ Reminder: {task.title}"
-                                notif_msg = (
-                                    f"Task '{task.title}' is due in {interval}. "
-                                    f"Due: {task.due_date.strftime('%b %d, %Y %H:%M') if task.due_date else 'soon'}."
-                                )
                                 try:
                                     db.execute(text("""
                                         INSERT INTO notification_logs
@@ -183,9 +184,18 @@ async def reminder_check_endpoint(
                                         "message": notif_msg,
                                         "event_id": event_id,
                                     })
+                                    db.flush()
                                     logger.info(f"In-app notification saved for task {task.id}")
                                 except Exception as db_err:
-                                    logger.warning(f"Failed to save in-app notification: {db_err}")
+                                    logger.error(
+                                        f"Failed to save in-app notification: {db_err}",
+                                        exc_info=True,
+                                    )
+                                    db.rollback()
+                                    errors.append(
+                                        f"in_app insert failed task={task.id} interval={interval}: {db_err}"
+                                    )
+                                    continue
 
                             # Publish to Kafka (best-effort — don't block on failure)
                             try:
@@ -203,7 +213,6 @@ async def reminder_check_endpoint(
 
                             task.reminder_sent[interval] = current_time.isoformat()
 
-                            # Commit update to database
                             db.add(task)
                             db.commit()
                             db.refresh(task)
