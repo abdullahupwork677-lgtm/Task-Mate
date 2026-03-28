@@ -2,7 +2,7 @@ import { clearToken, getToken } from './auth';
 import type { ApiError } from './types';
 
 /** API base URL: explicit env, else same origin; localhost:3000 → backend on 8000 (direct port-forward). */
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const g = typeof globalThis !== 'undefined' ? (globalThis as { process?: { env?: Record<string, string> } }).process?.env : undefined;
   const envUrl = (g?.NEXT_PUBLIC_API_URL ?? '').trim();
   if (envUrl) return envUrl;

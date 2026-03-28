@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { getToken } from '@/lib/auth';
+import { getApiBaseUrl } from '@/lib/api';
 
 interface VoiceRecorderProps {
   onTranscription: (text: string) => void;
@@ -139,7 +140,7 @@ export function VoiceRecorder({ onTranscription, disabled }: VoiceRecorderProps)
       formData.append('audio', audioBlob, 'recording.webm');
 
       // Send to backend via proxy (now supports FormData)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/proxy';
+      const apiUrl = getApiBaseUrl().replace(/\/$/, '');
 
       // Add timeout to prevent infinite loading (30 seconds max)
       const controller = new AbortController();
@@ -156,12 +157,23 @@ export function VoiceRecorder({ onTranscription, disabled }: VoiceRecorderProps)
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const error = await response.json();
-        // Handle specific error cases
-        if (error.detail && error.detail.includes('too short')) {
+        const ct = response.headers.get('content-type') || '';
+        let detail = `Transcription failed (${response.status})`;
+        try {
+          if (ct.includes('application/json')) {
+            const error = await response.json();
+            detail = error.detail || error.message || detail;
+          } else {
+            const text = await response.text();
+            if (text) detail = text.slice(0, 200);
+          }
+        } catch {
+          /* keep detail */
+        }
+        if (detail.includes('too short')) {
           throw new Error('Recording too short. Please hold the button longer (at least 0.5 seconds).');
         }
-        throw new Error(error.detail || 'Transcription failed');
+        throw new Error(detail);
       }
 
       const data = await response.json();

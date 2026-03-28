@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { getToken } from '@/lib/auth';
+import { getApiBaseUrl } from '@/lib/api';
 
 interface TextToSpeechProps {
   text: string;
@@ -56,7 +57,8 @@ export function TextToSpeech({ text, voice = 'nova', speed = 1.0 }: TextToSpeech
         throw new Error('Not authenticated');
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/proxy';
+      // Must match apiFetch (chat): same-origin / env URL — not /api/proxy alone (proxy BACKEND_URL often wrong in K8s)
+      const apiUrl = getApiBaseUrl().replace(/\/$/, '');
       const response = await fetch(`${apiUrl}/api/voice/text-to-speech`, {
         method: 'POST',
         headers: {
@@ -71,8 +73,20 @@ export function TextToSpeech({ text, voice = 'nova', speed = 1.0 }: TextToSpeech
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'TTS failed');
+        const ct = response.headers.get('content-type') || '';
+        let detail = `TTS failed (${response.status})`;
+        try {
+          if (ct.includes('application/json')) {
+            const error = await response.json();
+            detail = error.detail || error.message || detail;
+          } else {
+            const text = await response.text();
+            if (text) detail = text.slice(0, 200);
+          }
+        } catch {
+          /* keep detail */
+        }
+        throw new Error(detail);
       }
 
       // Get audio blob
