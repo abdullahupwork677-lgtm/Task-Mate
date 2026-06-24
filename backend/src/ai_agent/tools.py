@@ -411,145 +411,9 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
                 },
             },
         },
-        # set_task_deadline tool for deadline management
-        {
-            "type": "function",
-            "function": {
-                "name": "set_task_deadline",
-                "description": (
-                    "Set, update, or remove a task's deadline/due date. "
-                    "Use this when the user wants to: "
-                    "- Set a new deadline (e.g., 'Set deadline for task 5 to tomorrow') "
-                    "- Change existing deadline (e.g., 'Change task 3 deadline to next Friday') "
-                    "- Remove deadline completely (e.g., 'Remove deadline from task 7'). "
-                    "This is a FOCUSED tool specifically for deadline management."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "ID of the authenticated user (automatically provided)",
-                        },
-                        "task_id": {
-                            "type": "integer",
-                            "description": "ID of the task to update",
-                        },
-                        "due_date": {
-                            "type": "string",
-                            "description": (
-                                "New deadline in ISO 8601 format (e.g., '2026-01-15T14:30:00'). "
-                                "Extract from natural language: 'tomorrow', 'next Friday', 'January 20 at 2pm'. "
-                                "Set to null to REMOVE the deadline completely. "
-                                "Examples: 'tomorrow' → parse to ISO format, 'remove deadline' → null"
-                            ),
-                        },
-                    },
-                    "required": ["task_id"],
-                },
-            },
-        },
-        # Phase V: set_recurring tool for recurring tasks
-        {
-            "type": "function",
-            "function": {
-                "name": "set_recurring",
-                "description": (
-                    "Set a task as recurring, modify recurrence pattern, or cancel recurrence. "
-                    "Use this when the user wants to: "
-                    "- Make a task repeat (e.g., 'Make task 5 repeat weekly') "
-                    "- Change pattern (e.g., 'Change task 3 to daily') "
-                    "- Stop recurrence (e.g., 'Stop repeating task 7'). "
-                    "Supported: daily, weekly, monthly, yearly, 'every N days/weeks/months', 'none'."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "ID of the authenticated user (automatically provided)",
-                        },
-                        "task_id": {
-                            "type": "integer",
-                            "description": "ID of the task to set as recurring",
-                        },
-                        "pattern": {
-                            "type": "string",
-                            "description": (
-                                "Recurrence pattern. CRITICAL: Extract from user's message. "
-                                "Supported patterns: "
-                                "'daily' - repeat every day, "
-                                "'weekly' - repeat every week, "
-                                "'monthly' - repeat every month, "
-                                "'yearly' - repeat every year, "
-                                "'every N days' - custom interval (e.g., 'every 3 days'), "
-                                "'every N weeks' - custom interval (e.g., 'every 2 weeks'), "
-                                "'every N months' - custom interval (e.g., 'every 6 months'), "
-                                "'none' - cancel recurrence. "
-                                "Examples: 'repeat weekly' → 'weekly', 'every 3 days' → 'every 3 days', "
-                                "'stop repeating' → 'none'"
-                            ),
-                        },
-                        "end_date": {
-                            "type": "string",
-                            "description": (
-                                "Optional end date for recurrence (natural language or ISO format). "
-                                "Extract if user mentions when recurrence should stop. "
-                                "Examples: 'until next year' → 'next year', 'until December 31' → '2026-12-31'. "
-                                "Omit if user doesn't specify end date (infinite recurrence)."
-                            ),
-                        },
-                    },
-                    "required": ["task_id", "pattern"],
-                },
-            },
-        },
-        # Phase V - US1: set_due_date tool for natural language due date setting
-        {
-            "type": "function",
-            "function": {
-                "name": "set_due_date",
-                "description": (
-                    "Set or update a task's due date using natural language. "
-                    "Use this when the user wants to set a deadline, due date, or reminder time for a task. "
-                    "Supports natural language like 'tomorrow', 'next Friday at 5pm', 'Feb 15 at 2pm'. "
-                    "Examples: 'Set due date for task 5 to tomorrow at 5pm', "
-                    "'Change task 3 deadline to next Friday', 'Set task 7 due next Monday'."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "ID of the authenticated user (automatically provided)",
-                        },
-                        "task_id": {
-                            "type": "integer",
-                            "description": "ID of the task to set due date for",
-                        },
-                        "due_date_natural": {
-                            "type": "string",
-                            "description": (
-                                "Due date in natural language (Phase V - US1). "
-                                "CRITICAL: Extract exactly from user's message. "
-                                "Examples: 'tomorrow', 'tomorrow at 5pm', 'next Friday', "
-                                "'next Monday at 2pm', 'Feb 15', 'February 15 at 2pm', "
-                                "'in 3 days', 'next week'. "
-                                "DO NOT convert to ISO format - pass natural language as-is!"
-                            ),
-                        },
-                        "user_timezone": {
-                            "type": "string",
-                            "description": (
-                                "User's IANA timezone (e.g., 'America/New_York', 'Europe/London'). "
-                                "Defaults to 'UTC' if not provided. Use user's timezone for accurate date parsing."
-                            ),
-                        },
-                    },
-                    "required": ["task_id", "due_date_natural"],
-                },
-            },
-        },
+
+
+
         # Phase V - US4: set_reminder tool for custom reminder intervals
         {
             "type": "function",
@@ -596,53 +460,7 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
             },
         },
 
-        # Phase V - US5: update_notification_preferences tool
-        {
-            "type": "function",
-            "function": {
-                "name": "update_notification_preferences",
-                "description": (
-                    "Update user's notification channel preferences (email, push, in-app). "
-                    "Use this when the user wants to enable/disable specific notification channels. "
-                    "Examples: 'Turn off email reminders', 'Enable push notifications', "
-                    "'Disable in-app notifications', 'Turn on all notifications', 'Only notify me via email'."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "ID of the authenticated user (automatically provided)",
-                        },
-                        "email": {
-                            "type": "boolean",
-                            "description": (
-                                "Enable/disable email notifications. "
-                                "Leave null to keep current setting. "
-                                "True = enable, False = disable."
-                            ),
-                        },
-                        "push": {
-                            "type": "boolean",
-                            "description": (
-                                "Enable/disable push notifications. "
-                                "Leave null to keep current setting. "
-                                "True = enable, False = disable."
-                            ),
-                        },
-                        "in_app": {
-                            "type": "boolean",
-                            "description": (
-                                "Enable/disable in-app notifications. "
-                                "Leave null to keep current setting. "
-                                "True = enable, False = disable."
-                            ),
-                        },
-                    },
-                    "required": [],  # All fields are optional (user can update one at a time)
-                },
-            },
-        },
+
         # Phase V - US2 (003-task-tags): add_tag tool for adding tags to existing tasks
         {
             "type": "function",
@@ -720,105 +538,8 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
                 },
             },
         },
-        # Phase V US5 (003-task-tags): List all unique tags with counts and colors
-        {
-            "type": "function",
-            "function": {
-                "name": "list_tags",
-                "description": (
-                    "List all unique tags used by the user with usage counts and colors. "
-                    "Shows tag vocabulary and helps users discover which tags they've been using. "
-                    "Returns tags sorted by popularity (count descending) then alphabetically. "
-                    "Each tag includes: name (lowercase), color (hex code), and count (number of tasks). "
-                    "Phase V - Task Tags & Categories (003-task-tags) - User Story 5"
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "User ID (automatically provided by agent from authentication context)",
-                        }
-                    },
-                    "required": ["user_id"],
-                },
-            },
-        },
-        # Phase V US1 (004-search-filter): Search and filter tasks with multiple criteria
-        {
-            "type": "function",
-            "function": {
-                "name": "search_tasks",
-                "description": (
-                    "Search and filter tasks with keyword search, status, priority, tags, and due date filters. "
-                    "Supports pagination for large result sets. Use this when users want to find specific tasks. "
-                    "Examples: 'search for grocery tasks', 'find all high priority incomplete tasks', "
-                    "'show overdue work tasks', 'search for report in completed tasks'. "
-                    "Combines multiple filters with AND logic (keyword AND status AND priority...). "
-                    "Tags use OR logic (tasks with ANY of the specified tags). "
-                    "Phase V - Task Search & Advanced Filtering (004-search-filter) - User Story 1"
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "User ID (automatically provided by agent from authentication context)",
-                        },
-                        "keyword": {
-                            "type": "string",
-                            "description": (
-                                "Keyword for case-insensitive partial matching in task title and description. "
-                                "Examples: 'grocery', 'report', 'meeting'. Leave empty for no keyword filter."
-                            ),
-                        },
-                        "status_filter": {
-                            "type": "string",
-                            "enum": ["all", "pending", "completed"],
-                            "description": (
-                                "Filter by completion status. 'all' returns all tasks, 'pending' returns incomplete tasks, "
-                                "'completed' returns completed tasks. Default: 'all'"
-                            ),
-                        },
-                        "priority_filter": {
-                            "type": "string",
-                            "enum": ["all", "high", "medium", "low"],
-                            "description": (
-                                "Filter by priority level. 'all' returns all priorities. Default: 'all'"
-                            ),
-                        },
-                        "tags_filter": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": (
-                                "Filter by tags (OR logic - returns tasks with ANY of these tags). "
-                                "Example: ['work', 'urgent'] returns tasks tagged with 'work' OR 'urgent'. "
-                                "Leave empty for no tag filter."
-                            ),
-                        },
-                        "due_date_filter": {
-                            "type": "string",
-                            "enum": ["all", "overdue", "today", "this_week", "this_month", "no_due_date"],
-                            "description": (
-                                "Filter by due date category. 'overdue' shows past-due incomplete tasks, "
-                                "'today' shows tasks due today, 'this_week' shows tasks due this week, "
-                                "'this_month' shows tasks due this month, 'no_due_date' shows tasks without a due date. "
-                                "Default: 'all'"
-                            ),
-                        },
-                        "page": {
-                            "type": "integer",
-                            "description": "Page number for pagination (1-indexed). Default: 1",
-                        },
-                        "page_size": {
-                            "type": "integer",
-                            "description": "Number of results per page (max 100). Default: 20",
-                        },
-                    },
-                    "required": ["user_id"],
-                },
-            },
-        },
+
+
     ]
 
     return tools
@@ -831,25 +552,19 @@ def register_tools() -> List[Dict[str, Any]]:
         List of registered tool definitions
 
     Implemented tools:
-    - Phase 3: add_task ✓ (Phase V US1: natural language dates, Phase 8: recurring, US1 003-task-tags: tags)
-    - Phase 4: list_tasks ✓ (Phase V US1: due date display, Phase V: recurring filter)
-    - Phase 5: complete_task ✓ (Phase V US1: clear reminders, Phase V: auto-create next occurrence)
-    - Phase 6: update_task ✓ (Phase V US1: natural language dates, clear_due_date)
-    - Phase 7: delete_task ✓
-    - Phase 8: find_task ✓
-    - Phase 9: set_task_deadline ✓ (Dedicated deadline management)
-    - Phase V: set_recurring ✓ (Recurring tasks management)
-    - Phase V US1: set_due_date ✓ (Natural language due date setting)
-    - Phase V US4: set_reminder ✓ (Custom reminder intervals)
-    - Phase V US5: update_notification_preferences ✓ (Notification channel preferences)
-    - Phase V US2 (003-task-tags): add_tag ✓ (Add tags to existing tasks)
-    - Phase V US2 (003-task-tags): remove_tag ✓ (Remove tags from existing tasks)
-    - Phase V US5 (003-task-tags): list_tags ✓ (List all unique tags with counts and colors)
-    - Phase V US1 (004-search-filter): search_tasks ✓ (Search and filter tasks with multiple criteria)
+    - add_task (Create tasks with natural language)
+    - list_tasks (View and filter tasks)
+    - complete_task (Mark tasks complete)
+    - update_task (Modify task details)
+    - delete_task (Remove tasks)
+    - find_task (Search tasks by name)
+    - set_reminder (Set reminder intervals)
+    - add_tag (Add tags to tasks)
+    - remove_tag (Remove tags from tasks)
 
     Example:
         >>> tools = register_tools()
         >>> assert isinstance(tools, list)
-        >>> assert len(tools) == 14  # All 14 task management tools
+        >>> assert len(tools) == 9  # 9 task management tools
     """
     return get_tool_definitions()

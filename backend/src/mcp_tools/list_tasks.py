@@ -253,26 +253,19 @@ def list_tasks(db: Session, params: ListTasksParams) -> ListTasksResult:
 
     # Phase V - US3 (003-task-tags): Apply tag filter with OR logic (T030, T031)
     # Returns tasks with ANY of the specified tags (OR logic)
-    # Uses GIN index on tags column for optimal performance
     if params.tag_filter:
-        # Normalize tags for case-insensitive matching
         from ..services.tag_service import TagService
         tag_service = TagService()
         normalized_tags = tag_service.normalize_tags(params.tag_filter)
 
         if normalized_tags:
-            # Build OR condition: task has ANY of the specified tags
-            # For JSON column, we need to check if any tag in the filter exists in the array
-            from sqlalchemy import or_, func
-
-            # For each tag, check if it's in the task's tags array
+            from sqlalchemy import cast, String, or_
+            # Cross-database approach: cast tags to text and check with LIKE
+            # PostgreSQL: tags::text LIKE '%"tag"%'
+            tags_text = cast(Task.tags, String)
             tag_conditions = []
             for tag in normalized_tags:
-                # Check if the JSON array contains the tag
-                # SQLite: json_extract returns the array, we check if tag is in it
-                # PostgreSQL: jsonb array operator ?
-                tag_conditions.append(func.json_extract(Task.tags, '$').contains(tag))
-
+                tag_conditions.append(tags_text.like(f'%"{tag}"%'))
             if tag_conditions:
                 query = query.where(or_(*tag_conditions))
 

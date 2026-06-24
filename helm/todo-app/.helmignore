@@ -1,6 +1,0 @@
-# Helm ignore - exclude from chart package
-.git/
-.gitignore
-*.md
-*.log
-.DS_Store

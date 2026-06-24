@@ -758,7 +758,8 @@ async def chat(
             tag_match = re.search(r"(?:show|list)\s+([a-z0-9_-]+)\s+tasks", message_lower)
             if tag_match:
                 candidate = tag_match.group(1)
-                if candidate not in {"all", "pending", "completed", "complete", "high", "medium", "low"}:
+                EXCLUDED_TAG_WORDS = {"all", "pending", "completed", "complete", "high", "medium", "low", "my", "your", "our", "their", "the", "any", "some", "this", "that", "these", "those"}
+                if candidate not in EXCLUDED_TAG_WORDS:
                     list_params["tag_filter"] = [candidate]
 
             pre_forced_tool_calls.append({
@@ -1550,7 +1551,8 @@ async def chat(
                 tag_match = re.search(r"(?:show|list)\s+([a-z0-9_-]+)\s+tasks", msg)
                 if tag_match:
                     candidate = tag_match.group(1)
-                    if candidate not in {"all", "pending", "completed", "complete", "high", "medium", "low"}:
+                    EXCLUDED_TAG_WORDS = {"all", "pending", "completed", "complete", "high", "medium", "low", "my", "your", "our", "their", "the", "any", "some", "this", "that", "these", "those"}
+                    if candidate not in EXCLUDED_TAG_WORDS:
                         list_params["tag_filter"] = [candidate]
 
                 # FORCE list_tasks execution (user_id from auth in execution loop)
@@ -2615,10 +2617,12 @@ async def chat(
                 lines.append(f"- ...and {len(tool_errors) - 3} more")
             final_response = "\n".join(lines)
 
-        if executed_tools:
+        if executed_tools and not tool_errors:
             for tool_call in executed_tools:
                 if tool_call.get('tool') == 'list_tasks' and tool_call.get('result'):
                     result = tool_call['result']
+                    if 'error' in result:
+                        continue
                     tasks = result.get('tasks', [])
                     count = result.get('count', 0)
 

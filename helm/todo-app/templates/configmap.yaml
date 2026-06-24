@@ -1,9 +1,0 @@
-# Optional: non-secret config. Backend/frontend env from values and Secret.
-# Keeping minimal; expand if needed for log level, feature flags, etc.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "todo-app.name" . }}-config
-  labels:
-    {{- include "todo-app.labels" . | nindent 4 }}
-data: {}

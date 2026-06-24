@@ -1,2 +1,0 @@
-"""Middleware modules for cross-cutting concerns."""
-

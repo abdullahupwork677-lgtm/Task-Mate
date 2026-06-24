@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: todo-app
-  labels:
-    app: todo-chatbot
-    environment: production
-    cloud: oracle

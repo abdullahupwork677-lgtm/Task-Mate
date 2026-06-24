@@ -20,8 +20,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
-# Initialize OpenAI client
-client = OpenAI(api_key=settings.openai_api_key)
+# Lazily initialized OpenAI client (for Whisper/TTS when API key is available)
+_openai_client = None
+
+def get_openai_client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        if not settings.openai_api_key:
+            raise HTTPException(status_code=503, detail="OpenAI API key not configured for voice features")
+        _openai_client = OpenAI(api_key=settings.openai_api_key)
+    return _openai_client
 
 
 class TextToSpeechRequest(BaseModel):
@@ -100,6 +108,7 @@ async def transcribe_audio(
         logger.info(f"Transcribing audio for user {current_user}: {audio.filename}, size: {len(audio_bytes)} bytes")
 
         # Call Whisper API
+        client = get_openai_client()
         transcription = client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file,
@@ -160,6 +169,7 @@ async def text_to_speech(
         logger.info(f"Generating speech for user {current_user}: voice={request.voice}, speed={request.speed}, text_length={len(request.text)}")
 
         # Call OpenAI TTS API
+        client = get_openai_client()
         response = client.audio.speech.create(
             model="tts-1",
             voice=request.voice,

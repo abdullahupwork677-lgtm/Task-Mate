@@ -249,7 +249,10 @@ def format_due_date(due_date: datetime, user_timezone: str) -> str:
     local_date = due_date.astimezone(user_tz)
 
     # Format: "Saturday, February 15 at 9:00 AM"
-    formatted = local_date.strftime("%A, %B %d at %-I:%M %p")
+    hour_12 = local_date.hour % 12
+    if hour_12 == 0:
+        hour_12 = 12
+    formatted = local_date.strftime(f"%A, %B %d at {hour_12}:%M %p")
 
     return formatted
 

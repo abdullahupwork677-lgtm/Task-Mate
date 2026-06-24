@@ -37,24 +37,25 @@ def upgrade() -> None:
 
     if dialect_name == 'postgresql':
         # PostgreSQL: Full composite indexes with NULLS LAST and DESC
+        # Use IF NOT EXISTS to handle re-runs on Neon
         # Index 1: Sort by due_date (NULLS LAST, tiebreaker: created_at DESC)
         op.execute(
-            'CREATE INDEX idx_tasks_user_due_date ON tasks (user_id, due_date NULLS LAST, created_at DESC)'
+            'CREATE INDEX IF NOT EXISTS idx_tasks_user_due_date ON tasks (user_id, due_date NULLS LAST, created_at DESC)'
         )
 
         # Index 2: Sort by priority (tiebreaker: created_at DESC)
         op.execute(
-            'CREATE INDEX idx_tasks_user_priority ON tasks (user_id, priority, created_at DESC)'
+            'CREATE INDEX IF NOT EXISTS idx_tasks_user_priority ON tasks (user_id, priority, created_at DESC)'
         )
 
         # Index 3: Sort by created_at (default sort)
         op.execute(
-            'CREATE INDEX idx_tasks_user_created ON tasks (user_id, created_at DESC)'
+            'CREATE INDEX IF NOT EXISTS idx_tasks_user_created ON tasks (user_id, created_at DESC)'
         )
 
         # Index 4: Sort by title case-insensitive (tiebreaker: created_at DESC)
         op.execute(
-            'CREATE INDEX idx_tasks_user_title ON tasks (user_id, LOWER(title), created_at DESC)'
+            'CREATE INDEX IF NOT EXISTS idx_tasks_user_title ON tasks (user_id, LOWER(title), created_at DESC)'
         )
     else:
         # SQLite: Simpler indexes (NULLS LAST handled in query)

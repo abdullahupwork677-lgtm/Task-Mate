@@ -25,9 +25,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiry_days: int = 7
 
-    # OpenAI Configuration (Phase 3)
-    openai_api_key: str
-    openai_agent_model: str = "gpt-4o"
+    # OpenAI Configuration (for voice/Whisper/TTS features)
+    openai_api_key: str = ""
+
+    # Groq Configuration (Phase 3 - AI Chat Agent)
+    groq_api_key: str
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
 
     model_config = SettingsConfigDict(
         env_file=".env",

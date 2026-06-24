@@ -16,7 +16,7 @@ from datetime import datetime
 
 from openai import OpenAI, APIError, AuthenticationError, RateLimitError, APIConnectionError
 
-from .agent import initialize_agent, get_system_prompt
+from .agent import initialize_agent, get_system_prompt, get_agent_config
 from .tools import register_tools
 from ..mcp_tools.find_task import find_task, FindTaskParams
 from ..utils.performance import log_execution_time, track_performance
@@ -224,9 +224,10 @@ async def run_agent(
                 f"Agent execution for user {user_id}: message length {len(message)}"
             )
 
-            # Call OpenAI chat completions with function calling
+            # Call Groq chat completions (OpenAI-compatible API)
+            agent_config = get_agent_config()
             completion = client.chat.completions.create(
-                model="gpt-4o",
+                model=agent_config["model"],
                 messages=messages,
                 tools=tools,
                 tool_choice="auto"  # Let the model decide when to use tools
@@ -242,7 +243,7 @@ async def run_agent(
                 import json
                 for tool_call in response_message.tool_calls:
                     tool_name = tool_call.function.name
-                    raw_params = json.loads(tool_call.function.arguments)
+                    raw_params = json.loads(tool_call.function.arguments) or {}
 
                     # Enhance parameters with intelligent preprocessing
                     enhanced_params = enhance_tool_parameters(
